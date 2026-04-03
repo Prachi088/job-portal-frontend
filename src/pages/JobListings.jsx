@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getJobs, searchJobs, applyForJob } from '../services/api'
 import Navbar from '../components/Navbar'
-
+import { useAuth } from '../context/AuthContext'
 export default function JobListings() {
   const [jobs, setJobs] = useState([])
   const [search, setSearch] = useState('')
@@ -48,7 +48,9 @@ export default function JobListings() {
     setApplying(jobId)
 
     try {
-      const userId = 1 // TEMP (we fix later properly)
+ const { user } = useAuth()
+// then in handleApply:
+const userId = user?.id  // use real user id // TEMP (we fix later properly)
 
       await applyForJob({ userId, jobId })
 
