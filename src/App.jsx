@@ -1,13 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import JobListings from './pages/JobListings'
 import RecruiterDashboard from './pages/RecruiterDashboard'
 import MyApplications from './pages/MyApplications'
 import ProtectedRoute from './components/ProtectedRoute'
-import ChatBox from "./components/ChatBox";
+import ChatBox from "./components/ChatBox"
 
 function App() {
+
+  useEffect(() => {
+    const keepAlive = setInterval(() => {
+      fetch('https://job-portal-2ilb.onrender.com/health')
+    }, 840000) // ping every 14 mins to keep Render awake
+    return () => clearInterval(keepAlive)
+  }, [])
+
   return (
     <BrowserRouter>
       <Routes>
@@ -42,7 +51,6 @@ function App() {
           }
         />
 
-        {/* ✅ ADD THIS */}
         <Route
           path="/chat"
           element={
@@ -56,5 +64,4 @@ function App() {
     </BrowserRouter>
   )
 }
-
-export default App;
+export default App
