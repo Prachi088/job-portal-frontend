@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+ import { useState, useEffect } from 'react'
 import { getJobs, searchJobs, applyForJob } from '../services/api'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
+
 export default function JobListings() {
+  const { user } = useAuth()  // ✅ moved to top level - hooks rule fix
   const [jobs, setJobs] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -28,7 +30,6 @@ export default function JobListings() {
   const handleSearch = async (e) => {
     const val = e.target.value
     setSearch(val)
-
     try {
       if (!val.trim()) {
         fetchJobs()
@@ -44,22 +45,15 @@ export default function JobListings() {
 
   const handleApply = async (jobId) => {
     if (!jobId) return
-
     setApplying(jobId)
-
     try {
- const { user } = useAuth()
-// then in handleApply:
-const userId = user?.id  // use real user id // TEMP (we fix later properly)
-
+      const userId = user?.id  // ✅ using user from top-level hook, no hook inside function
       await applyForJob({ userId, jobId })
-
       setApplied(prev => [...prev, jobId])
     } catch (err) {
       console.error("Apply error:", err)
       alert("Failed to apply")
     }
-
     setApplying(null)
   }
 
@@ -75,7 +69,6 @@ const userId = user?.id  // use real user id // TEMP (we fix later properly)
         <p className="text-blue-100 mb-6">
           Explore hundreds of opportunities
         </p>
-
         <input
           type="text"
           placeholder="Search jobs..."
@@ -87,7 +80,6 @@ const userId = user?.id  // use real user id // TEMP (we fix later properly)
 
       {/* Jobs */}
       <div className="max-w-5xl mx-auto p-6">
-
         <h2 className="text-lg font-semibold mb-4">
           {jobs.length} Jobs Available
         </h2>
@@ -100,16 +92,14 @@ const userId = user?.id  // use real user id // TEMP (we fix later properly)
           </div>
         ) : (
           <div className="space-y-4">
-
             {jobs.map((job) => {
-              if (!job) return null // ✅ crash prevention
+              if (!job) return null
 
               return (
                 <div
                   key={job.id}
                   className="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"
                 >
-
                   {/* Job Info */}
                   <div>
                     <h3 className="font-semibold text-lg">
@@ -139,11 +129,9 @@ const userId = user?.id  // use real user id // TEMP (we fix later properly)
                       ? 'Applied'
                       : 'Apply'}
                   </button>
-
                 </div>
               )
             })}
-
           </div>
         )}
       </div>

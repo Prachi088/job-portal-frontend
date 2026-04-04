@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { getMyApplications, getJobs } from '../services/api'
 import Navbar from '../components/Navbar'
+import { useAuth } from '../context/AuthContext'  // ✅ added
 
 export default function MyApplications() {
+  const { user } = useAuth()  // ✅ get real logged-in user
   const [applications, setApplications] = useState([])
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,7 +15,7 @@ export default function MyApplications() {
     setLoading(true)
     try {
       const [appsRes, jobsRes] = await Promise.all([
-        getMyApplications(1),
+        getMyApplications(user?.id),  // ✅ real userId, not hardcoded 1
         getJobs()
       ])
       setApplications(appsRes.data)
