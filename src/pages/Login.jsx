@@ -19,13 +19,13 @@ export default function Login() {
     try {
       const res = await loginUser(form)
 
-      // ✅ use context
       login({
-  token: res.data.token,
-  name: res.data.name,
-  role: res.data.role,
-})
-console.log("LOGIN DATA:", res.data)
+        token: res.data.token,
+        name: res.data.name,
+        role: res.data.role,
+        id: res.data.id,       // ✅ added id
+      })
+
       if (res.data.role === 'RECRUITER') {
         navigate('/recruiter')
       } else {
@@ -43,7 +43,6 @@ console.log("LOGIN DATA:", res.data)
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
 
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
             <span className="text-white text-xl font-bold">J</span>
@@ -59,35 +58,26 @@ console.log("LOGIN DATA:", res.data)
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
               placeholder="you@example.com"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               value={form.email}
-              onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               type="password"
               placeholder="••••••••"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               value={form.password}
-              onChange={(e) =>
-                setForm({ ...form, password: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
             />
           </div>
@@ -99,15 +89,11 @@ console.log("LOGIN DATA:", res.data)
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-
         </form>
 
         <p className="text-center text-gray-500 mt-6 text-sm">
           Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="text-blue-600 font-semibold hover:underline"
-          >
+          <Link to="/register" className="text-blue-600 font-semibold hover:underline">
             Sign Up
           </Link>
         </p>
