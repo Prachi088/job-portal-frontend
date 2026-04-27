@@ -1,0 +1,14 @@
+/* Footer and shared component responsive styles are now consolidated in index.css */
+
+/* Responsive footer grid override for very small screens */
+@media (max-width: 600px) {
+  .chat-window {
+    right: 12px !important;
+    width: calc(100vw - 24px) !important;
+  }
+
+  .chat-fab {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+}

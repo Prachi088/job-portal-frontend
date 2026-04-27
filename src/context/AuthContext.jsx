@@ -1,23 +1,16 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // 🔥 important
-
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
     const name = localStorage.getItem("name");
     const role = localStorage.getItem("role");
-      const id    = localStorage.getItem("id");   // ← add this
-
-    if (token) {
-      setUser({ token, name, role });
-    }
-
-    setLoading(false); // ✅ done loading
-  }, []);
+    const id = localStorage.getItem("id");
+    return token ? { token, name, role, id } : null;
+  });
+  const loading = false; // since user is initialized synchronously
 
  const login = (data) => {
   const userData = {
@@ -46,4 +39,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

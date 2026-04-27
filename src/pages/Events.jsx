@@ -1,0 +1,319 @@
+import { useState, useEffect, useCallback } from 'react'
+import { createEvent, getEventsByRecruiter, getEventApplications, updateEventApplicationStatus } from '../services/api'
+
+export default function Events() {
+  const [events, setEvents] = useState([])
+  const [selectedEventApplications, setSelectedEventApplications] = useState([])
+  const [showForm, setShowForm] = useState(false)
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [form, setForm] = useState({
+    title: '', description: '', location: '', eventDate: '', organizer: '', requirements: ''
+  })
+
+  // Get recruiter ID from localStorage (assuming it's stored during login)
+  const recruiterId = localStorage.getItem('id')
+
+  const fetchEvents = useCallback(async () => {
+    if (!recruiterId) return
+    setLoading(true)
+    try {
+      const response = await getEventsByRecruiter(recruiterId)
+      setEvents(response.data)
+    } catch (err) {
+      console.error('Error fetching events:', err)
+    }
+    setLoading(false)
+  }, [recruiterId])
+
+  useEffect(() => {
+    fetchEvents()
+  }, [fetchEvents])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const eventData = {
+        ...form,
+        recruiterId,
+        eventDate: new Date(form.eventDate).toISOString()
+      }
+      await createEvent(eventData)
+      setSuccess(true)
+      setForm({ title: '', description: '', location: '', eventDate: '', organizer: '', requirements: '' })
+      setShowForm(false)
+      fetchEvents()
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      console.error('Error creating event:', err)
+    }
+    setSubmitting(false)
+  }
+
+  const handleViewApplications = async (event) => {
+    try {
+      const response = await getEventApplications(event.id)
+      setSelectedEventApplications(response.data)
+      setSelectedEvent(event)
+      setShowApplicationsModal(true)
+    } catch (err) {
+      console.error('Error fetching event applications:', err)
+    }
+  }
+
+  const handleUpdateApplicationStatus = async (applicationId, status) => {
+    try {
+      await updateEventApplicationStatus(applicationId, status)
+      // Refresh applications
+      if (selectedEvent) {
+        const response = await getEventApplications(selectedEvent.id)
+        setSelectedEventApplications(response.data)
+      }
+    } catch (err) {
+      console.error('Error updating application status:', err)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-10 px-4">
+        <div className="max-w-5xl mx-auto flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Events Management</h1>
+            <p className="text-deep-teal-100 mt-1">Create and manage career events</p>
+          </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-white text-deep-teal-600 font-semibold px-6 py-3 rounded-xl hover:bg-deep-teal-50 transition shadow"
+          >
+            {showForm ? 'Cancel' : '+ Create Event'}
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 py-8">
+
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Event created successfully!
+          </div>
+        )}
+
+        {/* Create Event Form */}
+        {showForm && (
+          <div className="bg-white rounded-2xl shadow-sm border border-deep-teal-100 p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">Create New Event</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Event Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tech Career Fair 2024"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Conference Hall, Tech Park"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Event Date & Time</label>
+                <input
+                  type="datetime-local"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  value={form.eventDate}
+                  onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Organizer</label>
+                <input
+                  type="text"
+                  placeholder="e.g. TechCorp HR Team"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  value={form.organizer}
+                  onChange={(e) => setForm({ ...form, organizer: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  placeholder="Describe the event, what students can expect..."
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition resize-none"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
+                <textarea
+                  placeholder="Any prerequisites or requirements for attendees..."
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition resize-none"
+                  value={form.requirements}
+                  onChange={(e) => setForm({ ...form, requirements: e.target.value })}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50"
+                >
+                  {submitting ? 'Creating Event...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Events List */}
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Events</h2>
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-10 h-10 border-4 border-deep-teal-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <p className="text-lg font-medium">No events created yet</p>
+            <p className="text-sm mt-1">Click "Create Event" to get started</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {events.map((event) => (
+              <div key={event.id} className="bg-white rounded-2xl border border-deep-teal-100 shadow-sm p-6 hover:shadow-md transition">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-800">{event.title}</h3>
+                    <p className="text-deep-teal-600 font-medium">{event.organizer}</p>
+                    <div className="flex gap-4 mt-2">
+                      <span className="text-sm text-gray-500">📍 {event.location}</span>
+                      <span className="text-sm text-gray-500">📅 {new Date(event.eventDate).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-gray-500 text-sm mt-2">{event.description}</p>
+                    {event.requirements && (
+                      <p className="text-gray-500 text-sm mt-1"><strong>Requirements:</strong> {event.requirements}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="bg-green-50 text-green-600 text-xs font-medium px-3 py-1 rounded-full border border-green-200">
+                      Active
+                    </span>
+                    <button
+                      onClick={() => handleViewApplications(event)}
+                      className="text-deep-teal-600 hover:text-deep-teal-700 text-sm font-medium underline"
+                    >
+                      View Registrations
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Event Applications Modal */}
+      {showApplicationsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Registrations for {selectedEvent?.title}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowApplicationsModal(false)
+                    setSelectedEvent(null)
+                    setSelectedEventApplications([])
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {selectedEventApplications.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <p className="text-lg font-medium">No registrations yet</p>
+                  <p className="text-sm mt-1">Registrations will appear here once students sign up</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {selectedEventApplications.map((app) => (
+                    <div key={app.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-sm transition">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="text-lg font-semibold text-gray-800">{app.user?.name || 'Unknown User'}</h4>
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                              app.status === 'REGISTERED' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
+                              app.status === 'ATTENDED' ? 'bg-green-50 text-green-600 border border-green-200' :
+                              'bg-red-50 text-red-600 border border-red-200'
+                            }`}>
+                              {app.status}
+                            </span>
+                          </div>
+                          <p className="text-gray-600 text-sm mb-2">{app.user?.email}</p>
+                          {app.user?.phone && <p className="text-gray-500 text-sm">📞 {app.user.phone}</p>}
+                          {app.user?.skills && <p className="text-gray-500 text-sm">🛠️ {app.user.skills}</p>}
+                          <p className="text-gray-500 text-sm">📅 Registered: {new Date(app.appliedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {app.status !== 'ATTENDED' && (
+                            <button
+                              onClick={() => handleUpdateApplicationStatus(app.id, 'ATTENDED')}
+                              className="bg-green-50 text-green-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-100 transition"
+                            >
+                              Mark Attended
+                            </button>
+                          )}
+                          {app.status !== 'CANCELLED' && (
+                            <button
+                              onClick={() => handleUpdateApplicationStatus(app.id, 'CANCELLED')}
+                              className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
