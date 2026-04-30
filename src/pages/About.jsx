@@ -47,23 +47,23 @@ export default function About() {
   const [menuOpen, setMenuOpen]   = useState(false);
   const [hoveredFeat, setHoveredFeat] = useState(null);
   const [hoveredStep, setHoveredStep] = useState(null);
-const isLoggedIn = !!localStorage.getItem("id");
-  // Refs for GSAP targets
-  const pageRef       = useRef(null);
-  const heroRef       = useRef(null);
-  const heroBadgeRef  = useRef(null);
-  const heroTitleRef  = useRef(null);
-  const heroSubRef    = useRef(null);
-  const heroBtnsRef   = useRef(null);
-  const trustBarRef   = useRef(null);
-  const blob1Ref      = useRef(null);
-  const blob2Ref      = useRef(null);
-  const statsRef      = useRef(null);
-  const featSectionRef= useRef(null);
+  const isLoggedIn = !!localStorage.getItem("id");
+
+  const pageRef        = useRef(null);
+  const heroRef        = useRef(null);
+  const heroBadgeRef   = useRef(null);
+  const heroTitleRef   = useRef(null);
+  const heroSubRef     = useRef(null);
+  const heroBtnsRef    = useRef(null);
+  const trustBarRef    = useRef(null);
+  const blob1Ref       = useRef(null);
+  const blob2Ref       = useRef(null);
+  const statsRef       = useRef(null);
+  const featSectionRef = useRef(null);
   const stepsSectionRef= useRef(null);
-  const audSectionRef = useRef(null);
-  const ctaSectionRef = useRef(null);
-  const navRef        = useRef(null);
+  const audSectionRef  = useRef(null);
+  const ctaSectionRef  = useRef(null);
+  const navRef         = useRef(null);
 
   // ── Fetch stats ───────────────────────────────────────────────
   useEffect(() => {
@@ -83,9 +83,7 @@ const isLoggedIn = !!localStorage.getItem("id");
   // ── GSAP Animations ───────────────────────────────────────────
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // ── Hero entrance sequence ──
       const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
       heroTl
         .fromTo(heroBadgeRef.current,
           { opacity: 0, y: -18, scale: 0.94 },
@@ -103,50 +101,26 @@ const isLoggedIn = !!localStorage.getItem("id");
           { opacity: 0, y: 12 },
           { opacity: 1, y: 0, duration: 0.45 }, "-=0.3");
 
-      // ── Blob parallax on scroll ──
       if (blob1Ref.current) {
         gsap.to(blob1Ref.current, {
-          y: -80,
-          ease: "none",
-          scrollTrigger: {
-            trigger: heroRef.current,
-            start: "top top",
-            end: "bottom top",
-            scrub: 1.4,
-          },
+          y: -80, ease: "none",
+          scrollTrigger: { trigger: heroRef.current, start: "top top", end: "bottom top", scrub: 1.4 },
         });
       }
       if (blob2Ref.current) {
         gsap.to(blob2Ref.current, {
-          y: -50,
-          x: 30,
-          ease: "none",
-          scrollTrigger: {
-            trigger: heroRef.current,
-            start: "top top",
-            end: "bottom top",
-            scrub: 1.8,
-          },
+          y: -50, x: 30, ease: "none",
+          scrollTrigger: { trigger: heroRef.current, start: "top top", end: "bottom top", scrub: 1.8 },
         });
       }
 
-      // ── Stats counter reveal ──
       if (statsRef.current) {
         const statCards = statsRef.current.querySelectorAll(".about-stat-card");
         gsap.fromTo(statCards,
           { opacity: 0, y: 32, scale: 0.96 },
-          {
-            opacity: 1, y: 0, scale: 1,
-            stagger: 0.09, duration: 0.6, ease: "power2.out",
-            scrollTrigger: {
-              trigger: statsRef.current,
-              start: "top 82%",
-              toggleActions: "play none none none",
-            },
-          }
+          { opacity: 1, y: 0, scale: 1, stagger: 0.09, duration: 0.6, ease: "power2.out",
+            scrollTrigger: { trigger: statsRef.current, start: "top 82%", toggleActions: "play none none none" } }
         );
-
-        // Animate stat numbers counting up
         const nums = statsRef.current.querySelectorAll(".about-stat-num");
         nums.forEach(el => {
           const raw = el.getAttribute("data-target");
@@ -155,111 +129,68 @@ const isLoggedIn = !!localStorage.getItem("id");
           if (isNaN(target)) return;
           const obj = { val: 0 };
           gsap.to(obj, {
-            val: target,
-            duration: 1.6,
-            ease: "power2.out",
-            delay: 0.3,
+            val: target, duration: 1.6, ease: "power2.out", delay: 0.3,
             onUpdate: () => { el.textContent = `${Math.floor(obj.val)}+`; },
-            scrollTrigger: {
-              trigger: statsRef.current,
-              start: "top 82%",
-              toggleActions: "play none none none",
-            },
+            scrollTrigger: { trigger: statsRef.current, start: "top 82%", toggleActions: "play none none none" },
           });
         });
       }
 
-      // ── Feature cards stagger reveal ──
       if (featSectionRef.current) {
         const cards = featSectionRef.current.querySelectorAll(".about-feat-card");
         gsap.fromTo(cards,
           { opacity: 0, y: 38, scale: 0.97 },
-          {
-            opacity: 1, y: 0, scale: 1,
-            stagger: 0.07, duration: 0.65, ease: "power3.out",
-            scrollTrigger: {
-              trigger: featSectionRef.current,
-              start: "top 80%",
-              toggleActions: "play none none none",
-            },
-          }
+          { opacity: 1, y: 0, scale: 1, stagger: 0.07, duration: 0.65, ease: "power3.out",
+            scrollTrigger: { trigger: featSectionRef.current, start: "top 80%", toggleActions: "play none none none" } }
         );
-
-        // Section title slide
         const title = featSectionRef.current.querySelector(".about-section-title");
         if (title) {
           gsap.fromTo(title,
             { opacity: 0, x: -28 },
-            {
-              opacity: 1, x: 0, duration: 0.65, ease: "power3.out",
-              scrollTrigger: { trigger: title, start: "top 85%", toggleActions: "play none none none" },
-            }
+            { opacity: 1, x: 0, duration: 0.65, ease: "power3.out",
+              scrollTrigger: { trigger: title, start: "top 85%", toggleActions: "play none none none" } }
           );
         }
       }
 
-      // ── Steps stagger ──
       if (stepsSectionRef.current) {
-        const steps = stepsSectionRef.current.querySelectorAll(".about-step-card");
-        gsap.fromTo(steps,
+        const stepsEls = stepsSectionRef.current.querySelectorAll(".about-step-card");
+        gsap.fromTo(stepsEls,
           { opacity: 0, y: 36, scale: 0.96 },
-          {
-            opacity: 1, y: 0, scale: 1,
-            stagger: 0.1, duration: 0.65, ease: "back.out(1.2)",
-            scrollTrigger: {
-              trigger: stepsSectionRef.current,
-              start: "top 80%",
-              toggleActions: "play none none none",
-            },
-          }
+          { opacity: 1, y: 0, scale: 1, stagger: 0.1, duration: 0.65, ease: "back.out(1.2)",
+            scrollTrigger: { trigger: stepsSectionRef.current, start: "top 80%", toggleActions: "play none none none" } }
         );
       }
 
-      // ── Audience cards slide in from sides ──
       if (audSectionRef.current) {
         const cards = audSectionRef.current.querySelectorAll(".about-aud-card");
         cards.forEach((card, i) => {
           gsap.fromTo(card,
             { opacity: 0, x: i % 2 === 0 ? -40 : 40 },
-            {
-              opacity: 1, x: 0, duration: 0.7, ease: "power3.out",
-              scrollTrigger: {
-                trigger: card,
-                start: "top 84%",
-                toggleActions: "play none none none",
-              },
-            }
+            { opacity: 1, x: 0, duration: 0.7, ease: "power3.out",
+              scrollTrigger: { trigger: card, start: "top 84%", toggleActions: "play none none none" } }
           );
         });
       }
 
-      // ── CTA scale + fade ──
       if (ctaSectionRef.current) {
         const box = ctaSectionRef.current.querySelector(".about-cta-box");
         if (box) {
           gsap.fromTo(box,
             { opacity: 0, scale: 0.95, y: 28 },
-            {
-              opacity: 1, scale: 1, y: 0, duration: 0.75, ease: "power3.out",
-              scrollTrigger: {
-                trigger: box,
-                start: "top 84%",
-                toggleActions: "play none none none",
-              },
-            }
+            { opacity: 1, scale: 1, y: 0, duration: 0.75, ease: "power3.out",
+              scrollTrigger: { trigger: box, start: "top 84%", toggleActions: "play none none none" } }
           );
         }
       }
 
-      // ── Nav scroll shadow ──
       if (navRef.current) {
         ScrollTrigger.create({
           start: "top -10",
           onUpdate: self => {
             if (navRef.current) {
               navRef.current.style.boxShadow = self.progress > 0
-                ? "0 4px 20px rgba(10,110,110,0.09)"
-                : "none";
+                ? "0 4px 20px rgba(10,110,110,0.09)" : "none";
             }
           },
         });
@@ -327,12 +258,10 @@ const isLoggedIn = !!localStorage.getItem("id");
       </nav>
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section ref={heroRef} style={s.hero}>
-        {/* Decorative blobs — animated via GSAP parallax */}
-        <div ref={blob1Ref} style={{ ...s.blob, top: -80, left: "5%",  background: "rgba(10,110,110,0.07)", width: 420, height: 420 }} />
-        <div ref={blob2Ref} style={{ ...s.blob, top: 40,  right: "3%", background: "rgba(232,130,12,0.06)", width: 320, height: 320 }} />
-        {/* Extra subtle blob */}
-        <div style={{ ...s.blob, bottom: -40, left: "30%", background: "rgba(5,150,105,0.045)", width: 280, height: 280 }} />
+      <section ref={heroRef} className="about-hero" style={s.hero}>
+        <div ref={blob1Ref} className="about-blob" style={{ ...s.blob, top: -80, left: "5%", background: "rgba(10,110,110,0.07)", width: 420, height: 420 }} />
+        <div ref={blob2Ref} className="about-blob" style={{ ...s.blob, top: 40, right: "3%", background: "rgba(232,130,12,0.06)", width: 320, height: 320 }} />
+        <div className="about-blob" style={{ ...s.blob, bottom: -40, left: "30%", background: "rgba(5,150,105,0.045)", width: 280, height: 280 }} />
 
         <div style={s.heroInner}>
           <a
@@ -340,9 +269,10 @@ const isLoggedIn = !!localStorage.getItem("id");
             href="https://www.satiengg.in/"
             target="_blank"
             rel="noopener noreferrer"
+            className="about-hero-badge"
             style={{ ...s.heroBadge, opacity: 0 }}
           >
-            🎓 Samrat Ashok Technological Institute · Vidisha, MP ↗
+            🎓 SATI · Vidisha, MP ↗
           </a>
 
           <h1 ref={heroTitleRef} style={{ ...s.heroTitle, opacity: 0 }}>
@@ -357,15 +287,15 @@ const isLoggedIn = !!localStorage.getItem("id");
 
           <div ref={heroBtnsRef} style={{ ...s.heroBtns, opacity: 0 }}>
             {isLoggedIn ? (
-              <button onClick={() => navigate("/dashboard")} style={s.btnPrimary}>
+              <button onClick={() => navigate("/dashboard")} style={s.btnPrimary} className="about-btn-primary">
                 Go to Dashboard →
               </button>
             ) : (
               <>
-                <button onClick={() => navigate("/login")} style={s.btnPrimary}>
+                <button onClick={() => navigate("/login")} style={s.btnPrimary} className="about-btn-primary">
                   Get Started — it's free
                 </button>
-                <button onClick={() => navigate("/login")} style={s.btnOutline}>
+                <button onClick={() => navigate("/login")} style={s.btnOutline} className="about-btn-outline">
                   Sign In
                 </button>
               </>
@@ -404,7 +334,7 @@ const isLoggedIn = !!localStorage.getItem("id");
       </section>
 
       {/* ── FEATURES ────────────────────────────────────────── */}
-      <section ref={featSectionRef} style={s.section}>
+      <section ref={featSectionRef} className="about-section" style={s.section}>
         <div style={s.inner}>
           <div style={s.eyebrow}>What we offer</div>
           <h2 className="about-section-title" style={{ ...s.sectionTitle, opacity: 0 }}>Everything in one place</h2>
@@ -437,7 +367,7 @@ const isLoggedIn = !!localStorage.getItem("id");
       </section>
 
       {/* ── HOW IT WORKS ────────────────────────────────────── */}
-      <section ref={stepsSectionRef} style={{ ...s.section, background: C.surfaceAlt }}>
+      <section ref={stepsSectionRef} className="about-section" style={{ ...s.section, background: C.surfaceAlt }}>
         <div style={s.inner}>
           <div style={s.eyebrow}>How it works</div>
           <h2 style={s.sectionTitle}>Up and running in 4 steps</h2>
@@ -468,7 +398,7 @@ const isLoggedIn = !!localStorage.getItem("id");
       </section>
 
       {/* ── AUDIENCE ────────────────────────────────────────── */}
-      <section ref={audSectionRef} style={s.section}>
+      <section ref={audSectionRef} className="about-section" style={s.section}>
         <div style={s.inner}>
           <div style={s.eyebrow}>Who it's for</div>
           <h2 style={s.sectionTitle}>Built for two audiences</h2>
@@ -530,7 +460,7 @@ const isLoggedIn = !!localStorage.getItem("id");
                 ? "Your dashboard and connections are waiting."
                 : "Register for free. It takes less than a minute."}
             </p>
-            <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <div className="about-cta-btns" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => navigate(isLoggedIn ? "/dashboard" : "/login")} style={s.ctaBtn}>
                 {isLoggedIn ? "Go to Dashboard →" : "Create your account →"}
               </button>
@@ -547,8 +477,7 @@ const isLoggedIn = !!localStorage.getItem("id");
       {/* ── FOOTER ──────────────────────────────────────────── */}
       <footer style={s.footer}>
         <div style={s.inner}>
-          <div style={s.footerTop}>
-            {/* Brand + description */}
+          <div className="about-footer-top" style={s.footerTop}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <div style={s.brandBox}>SATI</div>
@@ -564,7 +493,6 @@ const isLoggedIn = !!localStorage.getItem("id");
               </a>
             </div>
 
-            {/* Quick links */}
             <div style={s.footerLinks}>
               <span style={s.footerHead}>Quick links</span>
               {isLoggedIn
@@ -579,7 +507,6 @@ const isLoggedIn = !!localStorage.getItem("id");
               </a>
             </div>
 
-            {/* Social links */}
             <div style={s.footerLinks}>
               <span style={s.footerHead}>Connect</span>
               {[
@@ -601,26 +528,70 @@ const isLoggedIn = !!localStorage.getItem("id");
         </div>
       </footer>
 
-      {/* Responsive helper + pulse keyframe */}
+      {/* ── Responsive CSS + animations ─────────────────────── */}
       <style>{`
+        /* ── Hamburger / Nav ── */
         .about-ham { display: none !important; }
         @media (max-width: 640px) {
           .about-ham { display: flex !important; }
           .about-nav-links { display: none !important; }
         }
-        @keyframes aboutPulse {
-          0%, 100% { box-shadow: 0 0 0 3px rgba(5,150,105,0.2); }
-          50%       { box-shadow: 0 0 0 6px rgba(5,150,105,0.08); }
+
+        /* ── Hero ── */
+        .about-hero {
+          padding: 100px 24px 80px;
         }
-        .about-trust-dot {
-          animation: aboutPulse 2s ease-in-out infinite;
+        @media (max-width: 640px) {
+          .about-hero {
+            padding: 52px 20px 48px !important;
+          }
+          .about-hero-badge {
+            font-size: 11px !important;
+            padding: 6px 14px !important;
+          }
+          /* Hide large blobs on mobile to avoid visual noise */
+          .about-blob {
+            display: none;
+          }
         }
+
+        /* ── Sections ── */
+        .about-section {
+          padding: 80px 24px;
+        }
+        @media (max-width: 640px) {
+          .about-section {
+            padding: 48px 16px !important;
+          }
+        }
+
+        /* ── CTA box ── */
+        @media (max-width: 640px) {
+          .about-cta-box {
+            padding: 40px 20px !important;
+            border-radius: 18px !important;
+          }
+          .about-cta-btns {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .about-cta-btns button {
+            width: 100% !important;
+            text-align: center !important;
+          }
+        }
+
+        /* ── Footer ── */
+        @media (max-width: 640px) {
+          .about-footer-top {
+            flex-direction: column !important;
+            gap: 28px !important;
+          }
+        }
+
+        /* ── Hover interactions ── */
         .about-feat-card, .about-step-card {
           transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease !important;
-        }
-        .about-nav-link-hover:hover {
-          color: #0A6E6E !important;
-          background: rgba(10,110,110,0.06) !important;
         }
         .about-btn-primary:hover {
           transform: translateY(-2px);
@@ -630,8 +601,18 @@ const isLoggedIn = !!localStorage.getItem("id");
           border-color: #14A0A0 !important;
           background: rgba(10,110,110,0.04) !important;
         }
-        .about-footer-link-hover:hover {
-          color: #0A6E6E !important;
+
+        /* ── Stats section ── */
+        @media (max-width: 480px) {
+          .about-stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+
+        /* ── Pulse animation ── */
+        @keyframes aboutPulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(5,150,105,0.2); }
+          50%       { box-shadow: 0 0 0 6px rgba(5,150,105,0.08); }
         }
       `}</style>
     </div>
@@ -730,7 +711,6 @@ const s = {
 
   /* ── Hero ── */
   hero: {
-    padding: "100px 24px 80px",
     textAlign: "center",
     position: "relative",
     overflow: "hidden",
@@ -747,7 +727,7 @@ const s = {
     transition: "all 0.2s ease",
   },
   heroTitle: {
-    fontSize: "clamp(32px, 7vw, 56px)", fontWeight: 800, lineHeight: 1.12,
+    fontSize: "clamp(28px, 7vw, 56px)", fontWeight: 800, lineHeight: 1.12,
     margin: "0 0 22px", color: "#0D1F1F",
     fontFamily: "'Syne', sans-serif", letterSpacing: "-0.025em",
   },
@@ -757,21 +737,21 @@ const s = {
     backgroundClip: "text",
   },
   heroSub: {
-    fontSize: "clamp(15px, 2.5vw, 17px)", color: "#7A9595",
+    fontSize: "clamp(14px, 2.5vw, 17px)", color: "#7A9595",
     lineHeight: 1.8, margin: "0 auto 40px", maxWidth: 520,
   },
   heroBtns: { display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" },
   btnPrimary: {
     background: "linear-gradient(135deg, #0A6E6E, #14A0A0)",
     border: "none", color: "#fff", fontSize: 15, fontWeight: 700,
-    cursor: "pointer", padding: "13px 30px", borderRadius: 12,
+    cursor: "pointer", padding: "13px 28px", borderRadius: 12,
     boxShadow: "0 4px 20px rgba(10,110,110,0.28)", transition: "all 0.2s ease",
     fontFamily: "'DM Sans', sans-serif",
   },
   btnOutline: {
     background: "#FFFFFF", border: "1.5px solid #D4E0E0",
     color: "#0A6E6E", fontSize: 15, fontWeight: 600,
-    cursor: "pointer", padding: "13px 30px", borderRadius: 12,
+    cursor: "pointer", padding: "13px 28px", borderRadius: 12,
     transition: "all 0.2s ease", fontFamily: "'DM Sans', sans-serif",
     boxShadow: "0 2px 8px rgba(13,31,31,0.06)",
   },
@@ -794,20 +774,20 @@ const s = {
   },
   statsGrid: {
     maxWidth: 960, margin: "0 auto",
-    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16,
+    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16,
   },
   statCard: {
     background: "#F4F7F6",
-    border: "1px solid #D4E0E0", borderRadius: 16, padding: "24px 20px",
+    border: "1px solid #D4E0E0", borderRadius: 16, padding: "24px 16px",
     textAlign: "center", transition: "all 0.25s ease",
   },
   statIcon: { fontSize: 22, marginBottom: 8 },
   statNum: {
-    fontSize: "clamp(26px, 5vw, 38px)", fontWeight: 800,
+    fontSize: "clamp(24px, 5vw, 38px)", fontWeight: 800,
     color: "#0A6E6E", marginBottom: 6,
     fontFamily: "'Syne', sans-serif",
   },
-  statLabel: { fontSize: 13, color: "#7A9595", fontWeight: 500 },
+  statLabel: { fontSize: 12, color: "#7A9595", fontWeight: 500 },
 
   /* ── Sections ── */
   section: { padding: "80px 24px" },
@@ -818,16 +798,16 @@ const s = {
     display: "flex", alignItems: "center", gap: 8,
   },
   sectionTitle: {
-    fontSize: "clamp(22px, 5vw, 34px)", fontWeight: 800, color: "#0D1F1F",
-    marginBottom: 48, lineHeight: 1.2,
+    fontSize: "clamp(20px, 5vw, 34px)", fontWeight: 800, color: "#0D1F1F",
+    marginBottom: 40, lineHeight: 1.2,
     fontFamily: "'Syne', sans-serif",
   },
 
   /* ── Features ── */
-  featGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 },
+  featGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 },
   featCard: {
     background: "#FFFFFF",
-    border: "1px solid #D4E0E0", borderRadius: 18, padding: "28px 24px",
+    border: "1px solid #D4E0E0", borderRadius: 18, padding: "28px 22px",
     cursor: "default",
   },
   featIconWrap: {
@@ -843,10 +823,10 @@ const s = {
   featDesc: { fontSize: 13.5, color: "#7A9595", lineHeight: 1.7 },
 
   /* ── Steps ── */
-  stepsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20, position: "relative" },
+  stepsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, position: "relative" },
   stepCard: {
     background: "#FFFFFF", border: "1px solid #D4E0E0",
-    borderRadius: 18, padding: "28px 24px",
+    borderRadius: 18, padding: "28px 22px",
     position: "relative",
   },
   stepNum: {
@@ -858,9 +838,9 @@ const s = {
   stepDesc:  { fontSize: 13.5, color: "#7A9595", lineHeight: 1.7 },
 
   /* ── Audience ── */
-  audienceGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 24 },
+  audienceGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 24 },
   audienceCard: {
-    background: "#FFFFFF", borderRadius: 18, padding: "30px 26px",
+    background: "#FFFFFF", borderRadius: 18, padding: "28px 24px",
     transition: "all 0.2s ease",
     border: "1px solid #D4E0E0",
     boxShadow: "0 2px 10px rgba(13,31,31,0.055)",
@@ -892,21 +872,21 @@ const s = {
     position: "relative", overflow: "hidden",
   },
   ctaTitle: {
-    fontSize: "clamp(22px, 5vw, 32px)", fontWeight: 800, color: "#FFFFFF",
+    fontSize: "clamp(20px, 5vw, 32px)", fontWeight: 800, color: "#FFFFFF",
     marginBottom: 12, fontFamily: "'Syne', sans-serif",
   },
-  ctaSub: { fontSize: 16, color: "rgba(255,255,255,0.8)", marginBottom: 36 },
+  ctaSub: { fontSize: "clamp(14px, 2vw, 16px)", color: "rgba(255,255,255,0.8)", marginBottom: 32 },
   ctaBtn: {
     background: "#FFFFFF", border: "none",
     color: "#0A6E6E", fontSize: 15, fontWeight: 700,
-    cursor: "pointer", padding: "13px 30px", borderRadius: 12,
+    cursor: "pointer", padding: "13px 28px", borderRadius: 12,
     boxShadow: "0 4px 16px rgba(0,0,0,0.15)", transition: "all 0.2s ease",
     fontFamily: "'DM Sans', sans-serif",
   },
   ctaBtnGhost: {
     background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.4)",
     color: "#FFFFFF", fontSize: 15, fontWeight: 600,
-    cursor: "pointer", padding: "13px 30px", borderRadius: 12,
+    cursor: "pointer", padding: "13px 28px", borderRadius: 12,
     transition: "all 0.2s ease", fontFamily: "'DM Sans', sans-serif",
   },
 
@@ -916,7 +896,7 @@ const s = {
     borderTop: "1px solid #E8F0F0", padding: "52px 24px 28px",
   },
   footerTop: {
-    display: "flex", gap: 48, flexWrap: "wrap",
+    display: "flex", gap: 40, flexWrap: "wrap",
     marginBottom: 40, justifyContent: "space-between",
   },
   footerDesc: { fontSize: 13, color: "#7A9595", lineHeight: 1.85, marginTop: 12, maxWidth: 280 },
