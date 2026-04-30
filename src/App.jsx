@@ -9,6 +9,7 @@ import {
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
+import { Toaster } from "react-hot-toast";
 
 // Pages
 import Login from "./pages/Login";
@@ -157,6 +158,7 @@ function Layout() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <ParticleBackground />
       <ScrollProgressBar />
+      <Toaster position="top-right" />
 
       {!hideNav && <Navbar />}
 
