@@ -82,22 +82,22 @@ export default function Events() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-10 px-4">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
+      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-10 md:py-12 px-4">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
           <div>
-            <h1 className="text-3xl font-bold">Events Management</h1>
-            <p className="text-deep-teal-100 mt-1">Create and manage career events</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Events Management</h1>
+            <p className="text-deep-teal-100 mt-1 text-sm sm:text-base">Create and manage career events</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-white text-deep-teal-600 font-semibold px-6 py-3 rounded-xl hover:bg-deep-teal-50 transition shadow"
+            className="bg-white text-deep-teal-600 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:bg-deep-teal-50 transition shadow text-sm sm:text-base whitespace-nowrap"
           >
             {showForm ? 'Cancel' : '+ Create Event'}
           </button>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-4 py-6 sm:py-8">
 
         {/* Success Message */}
         {success && (

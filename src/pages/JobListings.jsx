@@ -107,16 +107,16 @@ export default function JobListings() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Hero */}
-      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-16 text-center">
-        <h1 className="text-4xl font-bold mb-4">Find Your Dream Job</h1>
-        <p className="text-deep-teal-100 mb-8 text-lg">Explore hundreds of opportunities and career events</p>
+      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-12 md:py-16 px-4 text-center">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">Find Your Dream Job</h1>
+        <p className="text-deep-teal-100 mb-6 sm:mb-8 text-sm sm:text-base md:text-lg">Explore hundreds of opportunities and career events</p>
 
         {/* Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white/10 rounded-xl p-1 backdrop-blur-sm">
+        <div className="flex justify-center mb-6 sm:mb-8 overflow-x-auto">
+          <div className="bg-white/10 rounded-xl p-1 backdrop-blur-sm flex gap-2 w-fit">
             <button
               onClick={() => setActiveTab('jobs')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base whitespace-nowrap ${
                 activeTab === 'jobs'
                   ? 'bg-white text-deep-teal-600 shadow-lg'
                   : 'text-white hover:bg-white/20'
@@ -126,7 +126,7 @@ export default function JobListings() {
             </button>
             <button
               onClick={() => setActiveTab('events')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base whitespace-nowrap ${
                 activeTab === 'events'
                   ? 'bg-white text-deep-teal-600 shadow-lg'
                   : 'text-white hover:bg-white/20'
@@ -137,8 +137,8 @@ export default function JobListings() {
           </div>
         </div>
 
-        <div className="relative max-w-lg mx-auto">
-          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="relative max-w-2xl mx-auto px-2">
+          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -146,14 +146,14 @@ export default function JobListings() {
             placeholder={`Search ${activeTab}...`}
             value={search}
             onChange={handleSearch}
-            className="w-full pl-12 pr-5 py-4 rounded-xl text-gray-800 outline-none shadow-lg text-lg"
+            className="w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 rounded-xl text-gray-800 outline-none shadow-lg text-sm sm:text-base"
           />
         </div>
       </div>
 
       {/* Jobs/Events */}
-      <div className="max-w-5xl mx-auto p-6">
-        <h2 className="text-lg font-semibold mb-4">
+      <div className="max-w-5xl mx-auto p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-4">
           {activeTab === 'jobs' ? `${jobs.length} Jobs Available` : `${events.length} Events Available`}
         </h2>
 
@@ -172,10 +172,10 @@ export default function JobListings() {
               return (
                 <div
                   key={job.id}
-                  className="bg-white p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200"
+                  className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200"
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
+                    <div className="flex-1 w-full min-w-0">
                       <h3 className="font-bold text-xl text-gray-800 mb-1">{job.title || "No Title"}</h3>
                       <div className="flex items-center gap-2 mb-2">
                         <svg className="w-4 h-4 text-deep-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,10 +223,10 @@ export default function JobListings() {
               return (
                 <div
                   key={event.id}
-                  className="bg-white p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200"
+                  className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200"
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
+                    <div className="flex-1 w-full min-w-0">
                       <h3 className="font-bold text-xl text-gray-800 mb-1">{event.title || "No Title"}</h3>
                       <div className="flex items-center gap-2 mb-2">
                         <svg className="w-4 h-4 text-deep-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

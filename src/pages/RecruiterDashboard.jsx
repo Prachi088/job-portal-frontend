@@ -81,27 +81,27 @@ export default function RecruiterDashboard() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-10 px-4">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
+      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-10 md:py-12 px-4">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
           <div>
-            <h1 className="text-3xl font-bold">Recruiter Dashboard</h1>
-            <p className="text-deep-teal-100 mt-1">Manage your job postings</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Recruiter Dashboard</h1>
+            <p className="text-deep-teal-100 mt-1 text-sm sm:text-base">Manage your job postings</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-white text-deep-teal-600 font-semibold px-6 py-3 rounded-xl hover:bg-deep-teal-50 transition shadow"
+            className="bg-white text-deep-teal-600 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:bg-deep-teal-50 transition shadow text-sm sm:text-base whitespace-nowrap"
           >
             {showForm ? 'Cancel' : '+ Post New Job'}
           </button>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-4 py-6 sm:py-8">
 
         {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm sm:text-base">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             Job posted successfully!
@@ -110,15 +110,15 @@ export default function RecruiterDashboard() {
 
         {/* Post Job Form */}
         {showForm && (
-          <div className="bg-white rounded-2xl shadow-sm border border-deep-teal-100 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-6">Post a New Job</h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-deep-teal-100 p-4 sm:p-6 mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-6">Post a New Job</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
                 <input
                   type="text"
                   placeholder="e.g. Java Developer"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  className="w-full px-4 py-2 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition text-sm sm:text-base"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   required
@@ -129,7 +129,7 @@ export default function RecruiterDashboard() {
                 <input
                   type="text"
                   placeholder="e.g. TechCorp"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  className="w-full px-4 py-2 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition text-sm sm:text-base"
                   value={form.company}
                   onChange={(e) => setForm({ ...form, company: e.target.value })}
                   required
@@ -140,7 +140,7 @@ export default function RecruiterDashboard() {
                 <input
                   type="text"
                   placeholder="e.g. Indore"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  className="w-full px-4 py-2 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition text-sm sm:text-base"
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                   required
@@ -151,7 +151,7 @@ export default function RecruiterDashboard() {
                 <input
                   type="text"
                   placeholder="e.g. 5 LPA"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
+                  className="w-full px-4 py-2 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition text-sm sm:text-base"
                   value={form.salary}
                   onChange={(e) => setForm({ ...form, salary: e.target.value })}
                   required
@@ -162,7 +162,7 @@ export default function RecruiterDashboard() {
                 <textarea
                   placeholder="Describe the job role, requirements..."
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition resize-none"
+                  className="w-full px-4 py-2 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition resize-none text-sm sm:text-base"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   required
@@ -172,7 +172,7 @@ export default function RecruiterDashboard() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50"
+                  className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-2 sm:py-3 rounded-xl transition disabled:opacity-50 text-sm sm:text-base"
                 >
                   {submitting ? 'Posting...' : 'Post Job'}
                 </button>
@@ -182,20 +182,18 @@ export default function RecruiterDashboard() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-5 border border-deep-teal-200 shadow-sm">
-            <p className="text-gray-500 text-sm">Total Jobs Posted</p>
-            <p className="text-3xl font-bold text-deep-teal-600 mt-1">{jobs.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-8">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-deep-teal-200 shadow-sm">
+            <p className="text-gray-500 text-xs sm:text-sm font-medium">Total Jobs Posted</p>
+            <p className="text-2xl sm:text-3xl font-bold text-deep-teal-600 mt-2">{jobs.length}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 border border-deep-teal-200 shadow-sm">
-            <p className="text-gray-500 text-sm">Active Listings</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{jobs.length}</p>
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-deep-teal-200 shadow-sm">
+            <p className="text-gray-500 text-xs sm:text-sm font-medium">Active Listings</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{jobs.length}</p>
           </div>
-          <div
-             className="bg-white rounded-2xl p-5 border border-deep-teal-200 shadow-sm"
-          >
-            <p className="text-gray-500 text-sm">Total Applications</p>
-            <p className="text-3xl font-bold text-indigo-600 mt-1">{applications.length}</p>
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-deep-teal-200 shadow-sm">
+            <p className="text-gray-500 text-xs sm:text-sm font-medium">Total Applications</p>
+            <p className="text-2xl sm:text-3xl font-bold text-indigo-600 mt-2">{applications.length}</p>
           </div>
         </div>
 

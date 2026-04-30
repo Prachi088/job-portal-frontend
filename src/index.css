@@ -362,7 +362,7 @@ body {
 .job-desc {
   font-size: 12.5px; color: var(--text-muted);
   line-height: 1.65;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .job-meta { font-size: 11.5px; color: var(--text-xmuted); margin-top: 8px; display: flex; gap: 14px; }
 
@@ -728,3 +728,121 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 500; letter-spacing:
 
 /* body bg override */
 body { background: var(--bg) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   COMPREHENSIVE RESPONSIVE MEDIA QUERIES — Mobile-First
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Extra Small (Mobile) — 320px - 480px ── */
+@media (max-width: 480px) {
+  .hero { padding: clamp(28px, 6vw, 40px) clamp(12px, 3vw, 16px); }
+  .hero h1 { font-size: clamp(1.5rem, 5vw, 1.75rem); }
+  .hero p { font-size: clamp(13px, 2vw, 14px); margin-bottom: clamp(12px, 3vw, 16px); }
+  .search-box { padding: 0 clamp(8px, 2vw, 12px); }
+  .search-box input { padding: clamp(10px, 2vw, 12px) clamp(10px, 2vw, 12px) clamp(10px, 2vw, 12px) clamp(32px, 7vw, 40px); font-size: 13px; }
+  
+  .stats-row { grid-template-columns: repeat(2, 1fr); gap: clamp(8px, 2vw, 10px); }
+  .stat-num { font-size: clamp(18px, 3.5vw, 24px); }
+  .stat-lbl { font-size: 9px; }
+  
+  .job-card { padding: clamp(12px, 3vw, 16px); }
+  .job-card-body { gap: clamp(8px, 2vw, 10px); }
+  .co-avatar { width: clamp(36px, 8vw, 40px); height: clamp(36px, 8vw, 40px); font-size: 13px; }
+  .job-title { font-size: 13px; }
+  .job-company { font-size: 12px; }
+  .btn-apply { padding: clamp(8px, 1.5vw, 10px) clamp(12px, 3vw, 16px); font-size: 12px; }
+  
+  .page-wrap { padding: clamp(16px, 4vw, 20px); }
+  .auth-card { padding: clamp(16px, 4vw, 20px); max-width: 100%; }
+  .auth-title { font-size: 18px; }
+  .form-input { font-size: 13px; padding: clamp(8px, 1.5vw, 10px) clamp(8px, 1.5vw, 10px); }
+  .btn-full { font-size: 13px; padding: clamp(8px, 1.5vw, 10px); }
+  
+  .nav { padding: 0 clamp(8px, 2vw, 12px); min-height: 56px; gap: clamp(6px, 1.5vw, 8px); }
+  .nav-logo-icon { width: clamp(24px, 4vw, 28px); height: clamp(24px, 4vw, 28px); }
+  .nav-links { display: none; }
+  
+  footer [style*=\"gridTemplateColumns\"] { grid-template-columns: 1fr !important; gap: 24px !important; }
+  .footer-grid { display: grid; grid-template-columns: 1fr !important; gap: 24px !important; }
+  
+  .chat-window { width: calc(100vw - 16px); bottom: calc(max(8px, env(safe-area-inset-bottom)) + clamp(40px, 10vw, 48px) + 8px); }
+}
+
+/* ── Small (Mobile to Tablet) — 481px - 640px ── */
+@media (min-width: 481px) and (max-width: 640px) {
+  .page-wrap { padding: clamp(20px, 5vw, 24px); }
+  .hero { padding: clamp(32px, 7vw, 44px) clamp(16px, 4vw, 20px); }
+  .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .auth-card { max-width: 100%; }
+  .nav { padding: 0 clamp(12px, 3vw, 16px); min-height: 60px; }
+  footer [style*=\"gridTemplateColumns\"] { grid-template-columns: 1fr !important; gap: 28px !important; }
+}
+
+/* ── Medium (Tablet) — 641px - 1024px ── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .page-wrap { padding: 24px 20px; }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  footer [style*=\"gridTemplateColumns\"] { grid-template-columns: 2fr 1fr 1fr !important; gap: 40px !important; }
+  
+  .job-card-body { flex-direction: row; }
+  .job-card { flex-direction: row; justify-content: space-between; }
+  .nav { padding: 0 clamp(16px, 3vw, 20px); }
+  .nav-links { display: flex; }
+}
+
+/* ── Large (Desktop) — 1025px+ ── */
+@media (min-width: 1025px) {
+  .page-wrap { padding: 32px 20px; }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .stats-row { grid-template-columns: repeat(4, 1fr); }
+  footer [style*=\"gridTemplateColumns\"] { grid-template-columns: 2fr 1fr 1fr !important; gap: 52px !important; }
+  
+  .nav { padding: 0 28px; min-height: 62px; }
+  .nav-links { display: flex; }
+  .job-card { flex-direction: row; justify-content: space-between; }
+  .job-card-body { flex-direction: row; }
+}
+
+/* ── Extra Large (Desktop XL) — 1440px+ ── */
+@media (min-width: 1440px) {
+  .max-w-5xl { max-width: 1280px; }
+  .page-wrap { max-width: 1280px; margin: 0 auto; }
+}
+
+/* ── Portrait Orientation — Mobile Devices ── */
+@media (orientation: portrait) and (max-width: 640px) {
+  .hero h1 { font-size: clamp(1.5rem, 6vw, 1.75rem); }
+  .job-card { flex-direction: column; }
+  .job-card-body { flex-direction: column; }
+}
+
+/* ── Landscape Orientation — Mobile Devices ── */
+@media (orientation: landscape) and (max-height: 600px) {
+  .hero { padding: clamp(16px, 3vw, 24px) clamp(12px, 2vw, 16px); }
+  .hero h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .hero p { margin-bottom: clamp(8px, 1.5vw, 12px); font-size: 12px; }
+  .search-box { max-width: 100%; }
+  .stats-row { gap: 8px; margin-bottom: 12px; }
+}
+
+/* ── Touch Device Optimizations ── */
+@media (hover: none) and (pointer: coarse) {
+  .btn-apply { padding: clamp(10px, 2vw, 12px) clamp(16px, 4vw, 22px); min-height: 44px; }
+  .btn-full { min-height: 48px; }
+  .form-input { min-height: 44px; }
+  .chat-fab { min-width: 48px; min-height: 48px; }
+}
+
+/* ── High DPI/Retina Displays ── */
+@media (min-resolution: 2dppx) {
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+}
+
+/* ── Prevent zoom on input focus (mobile) ── */
+@media (max-width: 640px) {
+  .form-input, .form-textarea, input, textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}

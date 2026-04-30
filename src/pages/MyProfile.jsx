@@ -149,14 +149,14 @@ export default function MyProfile() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-10 px-4">
+      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-10 md:py-12 px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold">{isViewingOtherProfile ? `${user?.name}'s Profile` : 'My Profile'}</h1>
-          <p className="text-deep-teal-100 mt-1">{isViewingOtherProfile ? 'View profile information' : 'Manage your professional information'}</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">{isViewingOtherProfile ? `${user?.name}'s Profile` : 'My Profile'}</h1>
+          <p className="text-deep-teal-100 mt-1 text-sm sm:text-base">{isViewingOtherProfile ? 'View profile information' : 'Manage your professional information'}</p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-4 py-6 sm:py-8">
 
         {/* Success Message */}
         {success && (
