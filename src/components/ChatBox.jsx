@@ -1,22 +1,44 @@
 import React, { useState, useRef, useEffect } from "react";
 import { sendMessage } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const ChatBox = () => {
+  // FIX: Guard here instead of wrapping in ProtectedRoute in App.jsx.
+  // ProtectedRoute shows <p>Loading…</p> while auth initialises, which
+  // means any "open-chatbox" event fired during that window is lost.
+  // Reading `user` directly is always synchronous after the first render.
+  const { user } = useAuth();
+
   const [messages, setMessages] = useState([
     { text: "Hello! I'm your AI career assistant. How can I help you today?", sender: "bot" },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(false);
   const chatBodyRef = useRef(null);
   const inputRef = useRef(null);
 
   // Listen for navbar button click to open chat
   useEffect(() => {
-    const handler = () => setOpen(true);
+    const handler = () => {
+      if (user) {
+        setOpen(true);
+      } else {
+        setPendingOpen(true);
+      }
+    };
+
     window.addEventListener("open-chatbox", handler);
     return () => window.removeEventListener("open-chatbox", handler);
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (pendingOpen && user) {
+      setOpen(true);
+      setPendingOpen(false);
+    }
+  }, [pendingOpen, user]);
 
   // Auto-scroll chat to bottom on new messages
   useEffect(() => {
@@ -25,7 +47,7 @@ const ChatBox = () => {
     }
   }, [messages, loading]);
 
-  // ✅ SCROLL TRAP FIX — prevent wheel/touch events from bubbling to Lenis
+  // SCROLL TRAP FIX — prevent wheel/touch events from bubbling to Lenis
   useEffect(() => {
     const el = chatBodyRef.current;
     if (!el) return;
@@ -35,7 +57,6 @@ const ChatBox = () => {
       const atTop = scrollTop === 0;
       const atBottom = scrollTop + clientHeight >= scrollHeight;
 
-      // Only block if scrolling beyond bounds would propagate
       if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
         e.preventDefault();
       }
@@ -51,6 +72,9 @@ const ChatBox = () => {
     };
   }, [open]);
 
+  // Don't render anything if the user isn't logged in
+  if (!user) return null;
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -61,11 +85,39 @@ const ChatBox = () => {
 
     try {
       const res = await sendMessage(input);
-      setMessages((prev) => [...prev, { text: res.data.reply, sender: "bot" }]);
-    } catch {
+
+      const data = res.data;
+      const replyText =
+        data?.reply ||
+        data?.message ||
+        data?.response ||
+        data?.answer ||
+        data?.text ||
+        (typeof data === "string" ? data : null) ||
+        "I received your message but couldn't parse the response.";
+
+      setMessages((prev) => [...prev, { text: replyText, sender: "bot" }]);
+    } catch (err) {
+      const status = err?.response?.status;
+      const responseData = err?.response?.data;
+      const serverMsg =
+        typeof responseData === "string"
+          ? responseData
+          : responseData?.message || responseData?.error || responseData?.detail;
+      const errorText =
+        status === 401
+          ? "Session expired. Please log in again."
+          : status === 404
+          ? "Chat service is unavailable. Please try again later."
+          : status >= 500
+          ? "Server error. Please try again later."
+          : typeof serverMsg === "string" && serverMsg
+          ? serverMsg
+          : "Something went wrong. Please try again.";
+
       setMessages((prev) => [
         ...prev,
-        { text: "Something went wrong. Please try again.", sender: "bot" },
+        { text: errorText, sender: "bot" },
       ]);
     }
     setLoading(false);
@@ -119,7 +171,7 @@ const ChatBox = () => {
           <div
             ref={chatBodyRef}
             style={styles.body}
-            data-lenis-prevent  /* Hint to Lenis to not capture scroll here */
+            data-lenis-prevent
           >
             {messages.map((msg, i) => (
               <div

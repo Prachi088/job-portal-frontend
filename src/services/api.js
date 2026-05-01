@@ -3,13 +3,30 @@ import axios from 'axios';
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL
 });
+
 API.interceptors.request.use((req) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        req.headers.Authorization = `Bearer ${token}`;
-    }
-    return req;
+  const token = localStorage.getItem('token');
+  if (token) {
+    req.headers = req.headers || {};
+    req.headers.Authorization = `Bearer ${token}`;
+  }
+  return req;
 });
+
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('name');
+      localStorage.removeItem('role');
+      localStorage.removeItem('id');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const registerUser = (data) => API.post('/auth/register', data);
 export const loginUser = (data) => API.post('/auth/login', data);
@@ -21,9 +38,11 @@ export const getMyApplications = (userId) => API.get(`/api/applications/user/${u
 export const getAllApplications = () => API.get('/api/applications');
 export const getApplicationsByJob = (jobId) => API.get(`/api/applications/job/${jobId}`);
 export const updateApplicationStatus = (id, status) => API.put(`/api/applications/${id}/status`, { status });
-export const sendMessage = (message) => {
-  return API.post('/chat', { message });
-};
+
+// ChatController.java is mapped to @RequestMapping("/chat") — NOT "/api/chat"
+// The backend security config also needs this token-authenticated, so we
+// send the Bearer token (handled automatically by the request interceptor above).
+export const sendMessage = (message) => API.post('/chat', { message });
 
 // User profile APIs
 export const getUserById = (id) => API.get(`/api/users/${id}`);

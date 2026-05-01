@@ -3,6 +3,63 @@ import { getJobs, searchJobs, applyForJob, getAllEvents, registerForEvent } from
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
+/* ── Skeleton card component ────────────────────────── */
+function SkeletonCard() {
+  return (
+    <div className="skeleton-card bg-white p-4 sm:p-6 rounded-2xl border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+        <div className="flex gap-4 flex-1 w-full">
+          <div className="skeleton skeleton-avatar w-12 h-12 flex-shrink-0" />
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="skeleton skeleton-title w-3/5" />
+            <div className="skeleton skeleton-text w-2/5" />
+            <div className="flex gap-3 mt-3">
+              <div className="skeleton skeleton-text w-24" />
+              <div className="skeleton skeleton-text w-20" />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-1 flex-shrink-0">
+          <div className="skeleton skeleton-btn w-16 h-9" />
+          <div className="skeleton skeleton-btn w-24 h-9" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonList({ count = 4 }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}
+    </div>
+  )
+}
+
+/* ── Company / organizer avatar ─────────────────────── */
+const AVATAR_COLORS = [
+  { bg: '#E8F2F0', text: '#3D7A6F' },
+  { bg: '#F2DDD5', text: '#C2826A' },
+  { bg: '#EBF7F1', text: '#2D7A5A' },
+  { bg: '#F3EFFB', text: '#6B4CAB' },
+  { bg: '#FDF6E8', text: '#A07030' },
+]
+
+function getColorForStr(str = '') {
+  const idx = (str.charCodeAt(0) || 0) % AVATAR_COLORS.length
+  return AVATAR_COLORS[idx]
+}
+
+/* ── Save / Bookmark icon ────────────────────────────── */
+function BookmarkIcon({ filled }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+/* ─────────────────────────────────────────────────────── */
 export default function JobListings() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('jobs')
@@ -12,7 +69,8 @@ export default function JobListings() {
   const [locationFilter, setLocationFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [showSaved, setShowSaved] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loadingJobs, setLoadingJobs] = useState(true)
+  const [loadingEvents, setLoadingEvents] = useState(false)
   const [applying, setApplying] = useState(null)
   const [applied, setApplied] = useState([])
   const [registeredEvents, setRegisteredEvents] = useState([])
@@ -20,79 +78,61 @@ export default function JobListings() {
   const [savedEvents, setSavedEvents] = useState([])
 
   const fetchJobs = useCallback(async () => {
-    setLoading(true)
+    setLoadingJobs(true)
     try {
       const res = await getJobs()
       setJobs(res?.data || [])
     } catch (err) {
-      console.error("Error fetching jobs:", err)
+      console.error('Error fetching jobs:', err)
       setJobs([])
     }
-    setLoading(false)
+    setLoadingJobs(false)
   }, [])
 
   const fetchEvents = useCallback(async () => {
-    setLoading(true)
+    setLoadingEvents(true)
     try {
       const res = await getAllEvents()
       setEvents(res?.data || [])
     } catch (err) {
-      console.error("Error fetching events:", err)
+      console.error('Error fetching events:', err)
       setEvents([])
     }
-    setLoading(false)
+    setLoadingEvents(false)
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'jobs') {
-      fetchJobs()
-    } else {
-      fetchEvents()
-    }
+    if (activeTab === 'jobs') fetchJobs()
+    else fetchEvents()
   }, [activeTab, fetchJobs, fetchEvents])
 
   useEffect(() => {
-    const savedJobsData = JSON.parse(localStorage.getItem('savedJobs') || '[]')
-    const savedEventsData = JSON.parse(localStorage.getItem('savedEvents') || '[]')
-    setSavedJobs(Array.isArray(savedJobsData) ? savedJobsData : [])
-    setSavedEvents(Array.isArray(savedEventsData) ? savedEventsData : [])
+    setSavedJobs(JSON.parse(localStorage.getItem('savedJobs') || '[]'))
+    setSavedEvents(JSON.parse(localStorage.getItem('savedEvents') || '[]'))
   }, [])
 
-  useEffect(() => {
-    localStorage.setItem('savedJobs', JSON.stringify(savedJobs))
-  }, [savedJobs])
-
-  useEffect(() => {
-    localStorage.setItem('savedEvents', JSON.stringify(savedEvents))
-  }, [savedEvents])
+  useEffect(() => { localStorage.setItem('savedJobs', JSON.stringify(savedJobs)) }, [savedJobs])
+  useEffect(() => { localStorage.setItem('savedEvents', JSON.stringify(savedEvents)) }, [savedEvents])
 
   const handleSearch = async (e) => {
     const val = e.target.value
     setSearch(val)
     try {
       if (!val.trim()) {
-        if (activeTab === 'jobs') {
-          fetchJobs()
-        } else {
-          fetchEvents()
-        }
+        activeTab === 'jobs' ? fetchJobs() : fetchEvents()
+      } else if (activeTab === 'jobs') {
+        const res = await searchJobs(val)
+        setJobs(res?.data || [])
       } else {
-        if (activeTab === 'jobs') {
-          const res = await searchJobs(val)
-          setJobs(res?.data || [])
-        } else {
-          // For events, filter locally since we don't have search API yet
-          const allEvents = await getAllEvents()
-          const filteredEvents = allEvents.data.filter(event =>
-            event.title.toLowerCase().includes(val.toLowerCase()) ||
-            event.description.toLowerCase().includes(val.toLowerCase())
+        const allRes = await getAllEvents()
+        setEvents((allRes.data || []).filter(ev =>
+          [ev.title, ev.description].some(f =>
+            String(f || '').toLowerCase().includes(val.toLowerCase())
           )
-          setEvents(filteredEvents)
-        }
+        ))
       }
     } catch (err) {
-      console.error("Search error:", err)
-      if (activeTab === 'jobs') setJobs([])
+      console.error('Search error:', err)
     }
   }
 
@@ -100,12 +140,12 @@ export default function JobListings() {
     if (!jobId) return
     setApplying(jobId)
     try {
-      const userId = user?.id
-      await applyForJob({ userId, jobId })
+      await applyForJob({ userId: user?.id, jobId })
       setApplied(prev => [...prev, jobId])
+      toast.success('Application submitted!')
     } catch (err) {
-      console.error("Apply error:", err)
-      toast.error("Failed to apply")
+      console.error('Apply error:', err)
+      toast.error('Failed to apply')
     }
     setApplying(null)
   }
@@ -114,321 +154,477 @@ export default function JobListings() {
     if (!eventId) return
     setApplying(eventId)
     try {
-      const userId = user?.id
-      await registerForEvent(eventId, userId)
+      await registerForEvent(eventId, user?.id)
       setRegisteredEvents(prev => [...prev, eventId])
+      toast.success('Registered for event!')
     } catch (err) {
-      console.error("Registration error:", err)
-      toast.error("Failed to register for event")
+      console.error('Registration error:', err)
+      toast.error('Failed to register for event')
     }
     setApplying(null)
   }
 
   const handleToggleSaveJob = (jobId) => {
-    setSavedJobs((prev) => {
-      const updated = prev.includes(jobId)
-        ? prev.filter((id) => id !== jobId)
-        : [...prev, jobId]
+    setSavedJobs(prev => {
+      const updated = prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]
       toast.success(updated.includes(jobId) ? 'Saved to your list' : 'Removed from saved jobs')
       return updated
     })
   }
 
   const handleToggleSaveEvent = (eventId) => {
-    setSavedEvents((prev) => {
-      const updated = prev.includes(eventId)
-        ? prev.filter((id) => id !== eventId)
-        : [...prev, eventId]
-      toast.success(updated.includes(eventId) ? 'Event saved for later' : 'Removed saved event')
+    setSavedEvents(prev => {
+      const updated = prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]
+      toast.success(updated.includes(eventId) ? 'Event saved' : 'Removed saved event')
       return updated
     })
   }
 
-  const clearFilters = () => {
-    setLocationFilter('all')
-    setTypeFilter('all')
-    setShowSaved(false)
-  }
+  const clearFilters = () => { setLocationFilter('all'); setTypeFilter('all'); setShowSaved(false) }
 
-  const locationOptions = useMemo(() => {
-    return [...new Set(
-      [...jobs, ...events]
-        .map((item) => item.location)
-        .filter(Boolean)
-    )]
-  }, [jobs, events])
+  const locationOptions = useMemo(() =>
+    [...new Set([...jobs, ...events].map(i => i.location).filter(Boolean))],
+    [jobs, events]
+  )
+  const jobTypes = useMemo(() =>
+    [...new Set(jobs.map(j => j.type).filter(Boolean))],
+    [jobs]
+  )
 
-  const jobTypes = useMemo(() => {
-    return [...new Set(jobs.map((job) => job.type).filter(Boolean))]
-  }, [jobs])
+  const filteredJobs = useMemo(() => jobs.filter(job => {
+    const matchSearch = [job.title, job.company, job.location, job.salary, job.description]
+      .some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))
+    return matchSearch
+      && (locationFilter === 'all' || job.location === locationFilter)
+      && (typeFilter === 'all' || job.type === typeFilter)
+      && (!showSaved || savedJobs.includes(job.id))
+  }), [jobs, search, locationFilter, typeFilter, showSaved, savedJobs])
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
-      const isSearchMatch = [job.title, job.company, job.location, job.salary, job.description]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(search.toLowerCase()))
+  const filteredEvents = useMemo(() => events.filter(ev => {
+    const matchSearch = [ev.title, ev.organizer, ev.location, ev.description]
+      .some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))
+    return matchSearch
+      && (locationFilter === 'all' || ev.location === locationFilter)
+      && (!showSaved || savedEvents.includes(ev.id))
+  }), [events, search, locationFilter, showSaved, savedEvents])
 
-      const matchesLocation = locationFilter === 'all' || job.location === locationFilter
-      const matchesType = typeFilter === 'all' || job.type === typeFilter
-      const matchesSaved = !showSaved || savedJobs.includes(job.id)
-
-      return isSearchMatch && matchesLocation && matchesType && matchesSaved
-    })
-  }, [jobs, search, locationFilter, typeFilter, showSaved, savedJobs])
-
-  const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
-      const isSearchMatch = [event.title, event.organizer, event.location, event.description]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(search.toLowerCase()))
-
-      const matchesLocation = locationFilter === 'all' || event.location === locationFilter
-      const matchesSaved = !showSaved || savedEvents.includes(event.id)
-
-      return isSearchMatch && matchesLocation && matchesSaved
-    })
-  }, [events, search, locationFilter, showSaved, savedEvents])
+  const isLoading = activeTab === 'jobs' ? loadingJobs : loadingEvents
+  const isEmpty   = activeTab === 'jobs' ? filteredJobs.length === 0 : filteredEvents.length === 0
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
+    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
 
-      {/* Hero */}
-      <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-12 md:py-16 px-4 text-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">Find Your Dream Job</h1>
-        <p className="text-deep-teal-100 mb-6 sm:mb-8 text-sm sm:text-base md:text-lg">Explore hundreds of opportunities and career events</p>
+      {/* ── Hero ── */}
+      <div style={{
+        background: 'linear-gradient(145deg, #2A5F55 0%, #3D7A6F 45%, #4A9086 100%)',
+        color: '#fff',
+        padding: 'clamp(32px, 8vw, 64px) clamp(16px, 5vw, 32px) clamp(24px, 6vw, 48px)',
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* subtle glow */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 50% at 50% 110%, rgba(194,130,106,0.18) 0%, transparent 70%)', pointerEvents:'none' }} />
 
-        {/* Tabs */}
-        <div className="flex justify-center mb-6 sm:mb-8 overflow-x-auto">
-          <div className="bg-white/10 rounded-xl p-1 backdrop-blur-sm flex gap-2 w-fit">
-            <button
-              onClick={() => setActiveTab('jobs')}
-              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base whitespace-nowrap ${
-                activeTab === 'jobs'
-                  ? 'bg-white text-deep-teal-600 shadow-lg'
-                  : 'text-white hover:bg-white/20'
-              }`}
-            >
-              Jobs
-            </button>
-            <button
-              onClick={() => setActiveTab('events')}
-              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base whitespace-nowrap ${
-                activeTab === 'events'
-                  ? 'bg-white text-deep-teal-600 shadow-lg'
-                  : 'text-white hover:bg-white/20'
-              }`}
-            >
-              Events
-            </button>
+        <h1 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(1.7rem, 5vw, 2.8rem)', fontWeight:500, marginBottom:10, letterSpacing:'-0.5px', position:'relative' }}>
+          Find Your Dream {activeTab === 'jobs' ? 'Job' : 'Event'}
+        </h1>
+        <p style={{ color:'rgba(255,255,255,0.72)', fontSize:'clamp(13px, 1.8vw, 15px)', marginBottom:24, position:'relative' }}>
+          {activeTab === 'jobs'
+            ? 'Explore curated opportunities from the SATI alumni network'
+            : 'Discover career events and networking opportunities'}
+        </p>
+
+        {/* Tab switcher */}
+        <div style={{ display:'flex', justifyContent:'center', marginBottom:24, position:'relative' }}>
+          <div style={{ background:'rgba(255,255,255,0.12)', borderRadius:14, padding:4, display:'flex', gap:4, backdropFilter:'blur(6px)' }}>
+            {['jobs', 'events'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding:'8px 24px',
+                  borderRadius:10,
+                  border:'none',
+                  fontFamily:'var(--font-body)',
+                  fontSize:14,
+                  fontWeight:600,
+                  cursor:'pointer',
+                  transition:'all 0.2s',
+                  background: activeTab === tab ? '#fff' : 'transparent',
+                  color: activeTab === tab ? 'var(--primary)' : 'rgba(255,255,255,0.85)',
+                  boxShadow: activeTab === tab ? '0 2px 12px rgba(28,36,34,0.15)' : 'none',
+                  textTransform:'capitalize',
+                }}
+              >
+                {tab === 'jobs' ? '💼 Jobs' : '📅 Events'}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="relative max-w-2xl mx-auto px-2">
-          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        {/* Search */}
+        <div style={{ maxWidth:560, margin:'0 auto', position:'relative' }}>
+          <svg
+            style={{ position:'absolute', left:16, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', zIndex:1 }}
+            width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input
             type="text"
-            placeholder={`Search ${activeTab}...`}
+            placeholder={`Search ${activeTab}…`}
             value={search}
             onChange={handleSearch}
-            className="w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 rounded-xl bg-white text-gray-800 outline-none shadow-lg text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100"
+            style={{
+              width:'100%',
+              padding:'14px 18px 14px 46px',
+              borderRadius:'var(--r-lg)',
+              border:'1.5px solid rgba(255,255,255,0.2)',
+              background:'rgba(255,255,255,0.97)',
+              fontSize:14,
+              outline:'none',
+              boxShadow:'var(--shadow-xl)',
+              fontFamily:'var(--font-body)',
+              color:'var(--text-primary)',
+            }}
           />
         </div>
       </div>
 
-      {/* Jobs/Events */}
-      <div className="max-w-5xl mx-auto p-4 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-          <div className="space-y-1">
-            <h2 className="text-base sm:text-lg font-semibold">
-              {activeTab === 'jobs' ? `${filteredJobs.length} Jobs Available` : `${filteredEvents.length} Events Available`}
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300">
-              Use filters to narrow search, save favorites, or switch to saved-only mode.
-            </p>
-          </div>
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center justify-center rounded-full border border-deep-teal-200 bg-white px-4 py-2 text-sm font-semibold text-deep-teal-700 transition hover:bg-deep-teal-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-700"
-          >
-            Reset filters
-          </button>
-        </div>
+      {/* ── Content ── */}
+      <div style={{ maxWidth:900, margin:'0 auto', padding:'clamp(16px, 4vw, 28px) clamp(14px, 4vw, 24px)' }}>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 mb-6">
-          <label className="block text-sm text-gray-700 dark:text-slate-300">
-            <span className="sr-only">Location filter</span>
+        {/* Toolbar */}
+        <div style={{ display:'flex', flexWrap:'wrap', gap:10, alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, flex:1 }}>
+            {/* Location filter */}
             <select
               value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="mt-1 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm outline-none transition focus:border-deep-teal-500 focus:ring-2 focus:ring-deep-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              onChange={e => setLocationFilter(e.target.value)}
+              style={selectStyle}
             >
-              <option value="all">All locations</option>
-              {locationOptions.map((location) => (
-                <option key={location} value={location}>{location}</option>
-              ))}
+              <option value="all">📍 All locations</option>
+              {locationOptions.map(loc => <option key={loc} value={loc}>{loc}</option>)}
             </select>
-          </label>
 
-          {activeTab === 'jobs' && (
-            <label className="block text-sm text-gray-700 dark:text-slate-300">
-              <span className="sr-only">Job type filter</span>
+            {/* Job type filter */}
+            {activeTab === 'jobs' && (
               <select
                 value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm outline-none transition focus:border-deep-teal-500 focus:ring-2 focus:ring-deep-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                onChange={e => setTypeFilter(e.target.value)}
+                style={selectStyle}
               >
-                <option value="all">All job types</option>
-                {jobTypes.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
+                <option value="all">🏷 All types</option>
+                {jobTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-            </label>
-          )}
+            )}
 
-          <button
-            onClick={() => setShowSaved((prev) => !prev)}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${showSaved ? 'border-deep-teal-700 bg-deep-teal-100 text-deep-teal-800 hover:bg-deep-teal-200' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'}`}
-          >
-            {showSaved ? 'Showing saved' : 'Show saved only'}
-          </button>
+            {/* Saved toggle */}
+            <button
+              onClick={() => setShowSaved(p => !p)}
+              style={{
+                ...selectStyle,
+                background: showSaved ? 'var(--primary-dim)' : 'var(--bg-surface)',
+                color: showSaved ? 'var(--primary)' : 'var(--text-secondary)',
+                border: showSaved ? '1px solid rgba(61,122,111,0.3)' : '1px solid var(--border)',
+                fontWeight: showSaved ? 600 : 400,
+                cursor:'pointer',
+              }}
+            >
+              <BookmarkIcon filled={showSaved} /> {showSaved ? 'Saved only' : 'Show saved'}
+            </button>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:13, color:'var(--text-muted)' }}>
+              <strong style={{ color:'var(--primary)' }}>
+                {activeTab === 'jobs' ? filteredJobs.length : filteredEvents.length}
+              </strong> {activeTab} found
+            </span>
+            <button onClick={clearFilters} style={resetBtnStyle}>
+              Reset
+            </button>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-deep-teal-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : (activeTab === 'jobs' ? filteredJobs.length === 0 : filteredEvents.length === 0) ? (
-          <div className="text-center py-10 text-gray-500">
-            No {activeTab} found
+        {/* ── List ── */}
+        {isLoading ? (
+          <SkeletonList count={4} />
+        ) : isEmpty ? (
+          <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--text-muted)' }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin:'0 auto 16px', opacity:0.35, display:'block' }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <p style={{ fontSize:16, fontFamily:'var(--font-display)', color:'var(--text-secondary)', marginBottom:6 }}>
+              No {activeTab} found
+            </p>
+            <p style={{ fontSize:13 }}>Try adjusting your search or filters</p>
+            <button onClick={clearFilters} style={{ ...resetBtnStyle, marginTop:16 }}>
+              Clear filters
+            </button>
           </div>
         ) : activeTab === 'jobs' ? (
-          <div className="space-y-4">
-            {filteredJobs.map((job) => {
-              if (!job) return null
-              return (
-                <div
-                  key={job.id}
-                  className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
-                    <div className="flex-1 w-full min-w-0">
-                      <h3 className="font-bold text-xl text-gray-800 mb-1">{job.title || "No Title"}</h3>
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-deep-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <p className="text-deep-teal-600 font-medium">{job.company || "Unknown"}</p>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {job.location || "-"}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                          </svg>
-                          {job.salary || "-"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <button
-                        onClick={() => handleToggleSaveJob(job.id)}
-                        className={`inline-flex items-center justify-center rounded-full border px-3 py-2 text-sm font-semibold transition ${savedJobs.includes(job.id) ? 'bg-deep-teal-100 border-deep-teal-200 text-deep-teal-800 hover:bg-deep-teal-200' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                        title={savedJobs.includes(job.id) ? 'Remove saved job' : 'Save job for later'}
-                      >
-                        {savedJobs.includes(job.id) ? 'Saved' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => handleApply(job.id)}
-                        disabled={applying === job.id || applied.includes(job.id)}
-                        className={`px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg ${
-                          applied.includes(job.id)
-                            ? 'bg-green-100 text-green-700 border border-green-200'
-                            : 'bg-deep-teal-600 hover:bg-deep-teal-700 text-white'
-                        }`}
-                      >
-                        {applying === job.id ? 'Applying...' : applied.includes(job.id) ? '✓ Applied' : 'Apply Now'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="space-y-3">
+            {filteredJobs.map(job => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isSaved={savedJobs.includes(job.id)}
+                isApplied={applied.includes(job.id)}
+                isApplying={applying === job.id}
+                onApply={() => handleApply(job.id)}
+                onToggleSave={() => handleToggleSaveJob(job.id)}
+              />
+            ))}
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredEvents.map((event) => {
-              if (!event) return null
-              return (
-                <div
-                  key={event.id}
-                  className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border-deep-teal-100 border hover:shadow-lg transition-all duration-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
-                    <div className="flex-1 w-full min-w-0">
-                      <h3 className="font-bold text-xl text-gray-800 mb-1">{event.title || "No Title"}</h3>
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-deep-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4v10m0 0l-2-2m2 2l2-2m6-6v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6a2 2 0 012-2h8a2 2 0 012 2z" />
-                        </svg>
-                        <p className="text-deep-teal-600 font-medium">{event.organizer || "Unknown"}</p>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {event.location || "-"}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4v10m0 0l-2-2m2 2l2-2m6-6v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6a2 2 0 012-2h8a2 2 0 012 2z" />
-                          </svg>
-                          {new Date(event.eventDate).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <p className="text-gray-600 text-sm mb-2">{event.description}</p>
-                      {event.requirements && (
-                        <p className="text-gray-500 text-sm"><strong>Requirements:</strong> {event.requirements}</p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <button
-                        onClick={() => handleToggleSaveEvent(event.id)}
-                        className={`inline-flex items-center justify-center rounded-full border px-3 py-2 text-sm font-semibold transition ${savedEvents.includes(event.id) ? 'bg-deep-teal-100 border-deep-teal-200 text-deep-teal-800 hover:bg-deep-teal-200' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                        title={savedEvents.includes(event.id) ? 'Remove saved event' : 'Save event for later'}
-                      >
-                        {savedEvents.includes(event.id) ? 'Saved' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => handleRegisterForEvent(event.id)}
-                        disabled={applying === event.id || registeredEvents.includes(event.id)}
-                        className={`px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg ${
-                          registeredEvents.includes(event.id)
-                            ? 'bg-green-100 text-green-700 border border-green-200'
-                            : 'bg-deep-teal-600 hover:bg-deep-teal-700 text-white'
-                        }`}
-                      >
-                        {applying === event.id ? 'Registering...' : registeredEvents.includes(event.id) ? '✓ Registered' : 'Register'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="space-y-3">
+            {filteredEvents.map(ev => (
+              <EventCard
+                key={ev.id}
+                event={ev}
+                isSaved={savedEvents.includes(ev.id)}
+                isRegistered={registeredEvents.includes(ev.id)}
+                isRegistering={applying === ev.id}
+                onRegister={() => handleRegisterForEvent(ev.id)}
+                onToggleSave={() => handleToggleSaveEvent(ev.id)}
+              />
+            ))}
           </div>
         )}
       </div>
     </div>
   )
+}
+
+/* ── Job Card ──────────────────────────────────────────── */
+function JobCard({ job, isSaved, isApplied, isApplying, onApply, onToggleSave }) {
+  const colors = getColorForStr(job.company)
+  return (
+    <div style={cardStyle} className="job-list-card">
+      <div style={{ display:'flex', gap:14, flex:1, minWidth:0 }}>
+        {/* Avatar */}
+        <div style={{ width:46, height:46, borderRadius:12, background:colors.bg, color:colors.text, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontSize:18, fontWeight:500, flexShrink:0 }}>
+          {(job.company || '?').charAt(0).toUpperCase()}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(14px, 2vw, 16px)', fontWeight:500, color:'var(--text-primary)', marginBottom:2, letterSpacing:'-0.2px' }}>
+            {job.title || 'No Title'}
+          </h3>
+          <p style={{ fontSize:13, color:'var(--primary)', fontWeight:500, marginBottom:8 }}>
+            {job.company || 'Unknown'}
+          </p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:12, fontSize:12.5, color:'var(--text-muted)' }}>
+            {job.location && (
+              <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                {job.location}
+              </span>
+            )}
+            {job.salary && (
+              <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                {job.salary}
+              </span>
+            )}
+            {job.type && (
+              <span style={{ background:'var(--primary-dim)', color:'var(--primary)', padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:600 }}>
+                {job.type}
+              </span>
+            )}
+          </div>
+          {job.description && (
+            <p style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:8, lineHeight:1.6, WebkitLineClamp:2, display:'-webkit-box', WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+              {job.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }} className="card-actions">
+        <button
+          onClick={onToggleSave}
+          title={isSaved ? 'Remove from saved' : 'Save job'}
+          style={{
+            background: isSaved ? 'var(--accent-light)' : 'var(--bg-subtle)',
+            color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
+            border: `1px solid ${isSaved ? 'rgba(194,130,106,0.3)' : 'var(--border)'}`,
+            borderRadius:'var(--r-md)',
+            padding:'8px 10px',
+            cursor:'pointer',
+            transition:'all 0.15s',
+            display:'flex',
+            alignItems:'center',
+            justifyContent:'center',
+          }}
+        >
+          <BookmarkIcon filled={isSaved} />
+        </button>
+
+        <button
+          onClick={onApply}
+          disabled={isApplied || isApplying}
+          style={{
+            background: isApplied ? 'var(--success-bg)' : 'var(--primary)',
+            color: isApplied ? 'var(--success)' : '#fff',
+            border: isApplied ? '1px solid var(--success-border)' : 'none',
+            borderRadius:'var(--r-md)',
+            padding:'9px 18px',
+            fontSize:13,
+            fontWeight:600,
+            cursor: isApplied ? 'default' : 'pointer',
+            fontFamily:'var(--font-body)',
+            whiteSpace:'nowrap',
+            transition:'all 0.18s',
+            opacity: isApplying ? 0.6 : 1,
+          }}
+        >
+          {isApplying ? 'Applying…' : isApplied ? '✓ Applied' : 'Apply Now'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Event Card ─────────────────────────────────────────── */
+function EventCard({ event, isSaved, isRegistered, isRegistering, onRegister, onToggleSave }) {
+  const colors = getColorForStr(event.organizer)
+  const dateObj = event.eventDate ? new Date(event.eventDate) : null
+  return (
+    <div style={cardStyle} className="job-list-card">
+      <div style={{ display:'flex', gap:14, flex:1, minWidth:0 }}>
+        {/* Date badge */}
+        <div style={{ width:46, height:46, borderRadius:12, background:colors.bg, color:colors.text, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0, fontFamily:'var(--font-display)' }}>
+          {dateObj ? (
+            <>
+              <span style={{ fontSize:11, fontWeight:600, lineHeight:1 }}>
+                {dateObj.toLocaleString('default', { month:'short' }).toUpperCase()}
+              </span>
+              <span style={{ fontSize:18, fontWeight:700, lineHeight:1 }}>
+                {dateObj.getDate()}
+              </span>
+            </>
+          ) : '📅'}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(14px, 2vw, 16px)', fontWeight:500, color:'var(--text-primary)', marginBottom:2, letterSpacing:'-0.2px' }}>
+            {event.title || 'No Title'}
+          </h3>
+          <p style={{ fontSize:13, color:'var(--primary)', fontWeight:500, marginBottom:8 }}>
+            {event.organizer || 'Unknown organizer'}
+          </p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:12, fontSize:12.5, color:'var(--text-muted)' }}>
+            {event.location && (
+              <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                {event.location}
+              </span>
+            )}
+            {dateObj && (
+              <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                {dateObj.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' })}
+              </span>
+            )}
+          </div>
+          {event.description && (
+            <p style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:8, lineHeight:1.6, WebkitLineClamp:2, display:'-webkit-box', WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+              {event.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }} className="card-actions">
+        <button
+          onClick={onToggleSave}
+          title={isSaved ? 'Remove from saved' : 'Save event'}
+          style={{
+            background: isSaved ? 'var(--accent-light)' : 'var(--bg-subtle)',
+            color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
+            border: `1px solid ${isSaved ? 'rgba(194,130,106,0.3)' : 'var(--border)'}`,
+            borderRadius:'var(--r-md)', padding:'8px 10px', cursor:'pointer',
+            transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center',
+          }}
+        >
+          <BookmarkIcon filled={isSaved} />
+        </button>
+
+        <button
+          onClick={onRegister}
+          disabled={isRegistered || isRegistering}
+          style={{
+            background: isRegistered ? 'var(--success-bg)' : 'var(--primary)',
+            color: isRegistered ? 'var(--success)' : '#fff',
+            border: isRegistered ? '1px solid var(--success-border)' : 'none',
+            borderRadius:'var(--r-md)', padding:'9px 18px', fontSize:13, fontWeight:600,
+            cursor: isRegistered ? 'default' : 'pointer', fontFamily:'var(--font-body)',
+            whiteSpace:'nowrap', transition:'all 0.18s', opacity: isRegistering ? 0.6 : 1,
+          }}
+        >
+          {isRegistering ? 'Registering…' : isRegistered ? '✓ Registered' : 'Register'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Shared styles ────────────────────────────────────── */
+const cardStyle = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--r-lg)',
+  padding: 'clamp(14px, 3vw, 22px) clamp(14px, 3vw, 22px)',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 16,
+  transition: 'all 0.2s',
+  boxShadow: 'var(--shadow-sm)',
+  flexWrap: 'wrap',
+}
+
+const selectStyle = {
+  padding: '8px 14px',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-surface)',
+  fontSize: 13,
+  color: 'var(--text-secondary)',
+  fontFamily: 'var(--font-body)',
+  outline: 'none',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  appearance: 'none',
+  WebkitAppearance: 'none',
+}
+
+const resetBtnStyle = {
+  padding: '8px 14px',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-surface)',
+  fontSize: 12.5,
+  color: 'var(--text-muted)',
+  fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
+  transition: 'all 0.15s',
+  fontWeight: 500,
 }

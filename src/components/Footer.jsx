@@ -19,12 +19,35 @@ const TwitterIcon = () => (
   </svg>
 );
 
+// FIX: Helper that scrolls to top in a way that works with Lenis.
+// Lenis overrides native window.scrollTo, so we must use the Lenis
+// instance directly when it's active, and fall back to the native API
+// for pages where Lenis hasn't initialised yet.
+function scrollToTop() {
+  // Lenis attaches itself to window.__lenis__ in some setups; here the
+  // app stores it in the module-level `lenisInstance` variable inside
+  // App.jsx and also ticks via gsap. We reach it through the global
+  // gsap ticker object is not accessible here, so we use the documented
+  // Lenis approach: dispatch a custom event that App.jsx can handle,
+  // OR — the simplest reliable approach — call lenis.scrollTo(0) via
+  // the globally exposed instance if available, otherwise fall back.
+  const lenis = window.__lenis__;
+  if (lenis && typeof lenis.scrollTo === "function") {
+    lenis.scrollTo(0, { immediate: true });
+  } else {
+    // Fallback for pages without Lenis (login, register, about)
+    window.scrollTo({ top: 0, behavior: "instant" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+}
+
 export default function Footer() {
   const navigate  = useNavigate();
   const location  = useLocation();
 
   const isLoggedIn = !!localStorage.getItem("token");
-  const hidden = ["/about", "/login"].includes(location.pathname);
+  const hidden = ["/about", "/login", "/register"].includes(location.pathname);
   if (hidden) return null;
 
   const navLinks = [
@@ -41,10 +64,18 @@ export default function Footer() {
     { label: "Twitter",  href: "https://twitter.com/",   icon: <TwitterIcon />,  hoverColor: "#1DA1F2" },
   ];
 
+  // FIX: Navigate then immediately scroll to top, accounting for Lenis.
+  const handleNavClick = (path) => {
+    navigate(path);
+    // Use setTimeout(0) to let React Router finish the navigation and
+    // mount the new page before we reset the scroll position.
+    setTimeout(scrollToTop, 0);
+  };
+
   return (
     <footer style={s.footer}>
       <div style={s.inner}>
-        <div style={s.grid}>
+        <div style={s.grid} className="footer-grid">
 
           {/* Brand column */}
           <div style={s.brandCol}>
@@ -81,7 +112,7 @@ export default function Footer() {
                 <li key={label}>
                   <button
                     className="footer-nav-link"
-                    onClick={() => navigate(path)}
+                    onClick={() => handleNavClick(path)}
                     style={{
                       ...s.navLink,
                       color: location.pathname === path ? "var(--primary)" : "var(--text-muted)",
@@ -157,12 +188,8 @@ const s = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr",
     gap: "clamp(24px, 6vw, 52px)",
     paddingBottom: "clamp(24px, 6vw, 44px)",
-    "@media (min-width: 768px)": {
-      gridTemplateColumns: "2fr 1fr 1fr",
-    },
   },
   brandCol: { display: "flex", flexDirection: "column", gap: 0 },
   brandRow: {

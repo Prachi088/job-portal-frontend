@@ -7,6 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import gsap from "gsap";
+import { useAuth } from "./context/AuthContext";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { Toaster } from "react-hot-toast";
@@ -21,8 +22,10 @@ import MyApplications from "./pages/MyApplications";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
 import MyProfile from "./pages/MyProfile";
 
-// Shared pages
-import { Connected, Requests, MyJobs, MyEvents } from "./pages/Sharedpages_";
+// FIX: was importing from Sharedpages_ (stub placeholders that just render
+// bare text like "Connected", "Requests" etc.).  The real styled pages
+// with proper UI live in SharedPages.jsx — import from there instead.
+import { Connected, Requests, MyJobs, MyEvents } from "./pages/SharedPages";
 
 // Components
 import Navbar from "./components/Navbar";
@@ -41,7 +44,6 @@ function createLenis() {
   const lenis = new Lenis({
     duration: 1.1,
     smoothWheel: true,
-    // ✅ Tell Lenis to ignore elements with data-lenis-prevent attribute
     prevent: (node) => node.hasAttribute("data-lenis-prevent"),
   });
 
@@ -51,6 +53,8 @@ function createLenis() {
   lenis.on("scroll", ScrollTrigger.update);
 
   lenisInstance = lenis;
+  window.__lenis__ = lenis;
+
   return lenis;
 }
 
@@ -129,7 +133,11 @@ function AnimatedPage({ children }) {
     const el = ref.current;
     if (!el) return;
 
-    window.scrollTo(0, 0);
+    if (lenisInstance && typeof lenisInstance.scrollTo === "function") {
+      lenisInstance.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo(0, 0);
+    }
     ScrollTrigger.refresh();
 
     const ctx = gsap.context(() => {
@@ -146,8 +154,17 @@ function AnimatedPage({ children }) {
 }
 
 // ─── Layout ────────────────────────────────────────────
+function DashboardRedirect() {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={user.role === "RECRUITER" ? "/recruiter" : "/jobs"} replace />;
+}
+
 function Layout() {
   const location = useLocation();
+  const { user } = useAuth();
   const hideNav = ["/login", "/register", "/about"].includes(location.pathname);
 
   useEffect(() => {
@@ -177,6 +194,7 @@ function Layout() {
             <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
 
             <Route path="/recruiter" element={<ProtectedRoute><RecruiterDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<DashboardRedirect />} />
             <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
             <Route path="/connected" element={<ProtectedRoute><Connected /></ProtectedRoute>} />
             <Route path="/my-jobs" element={<ProtectedRoute><MyJobs /></ProtectedRoute>} />
@@ -189,12 +207,14 @@ function Layout() {
 
       <Footer />
 
-      {/* ChatBox floating widget — visible on all protected pages */}
-      {!hideNav && (
-        <ProtectedRoute>
-          <ChatBox />
-        </ProtectedRoute>
-      )}
+      {/*
+        ChatBox is NOT wrapped in ProtectedRoute.
+        ProtectedRoute renders <p>Loading...</p> while auth is initialising,
+        which means the "open-chatbox" event fired from the Navbar lands on an
+        unmounted ChatBox and is silently lost. Instead ChatBox reads `user`
+        directly and returns null if not logged in — no race condition.
+      */}
+      {!hideNav && <ChatBox />}
     </div>
   );
 }

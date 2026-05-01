@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getUserById, updateUserProfile, uploadResume, downloadResume } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -17,9 +17,24 @@ export default function MyProfile() {
     company: '', currentRole: '', linkedinUrl: '', website: ''
   })
 
-  const userId = searchParams.get('userId') || authUser?.id || localStorage.getItem('id')
-  const userRole = user?.role || authUser?.role || localStorage.getItem('role')
-  const isViewingOtherProfile = searchParams.get('userId') !== null
+  // Resolve which user ID to load
+  const rawId = searchParams.get('userId') || authUser?.id || localStorage.getItem('id')
+  const userId = rawId && rawId !== 'null' && rawId !== 'undefined' ? rawId : null
+
+  // FIX: isViewingOtherProfile now compares the query-param userId against
+  // the logged-in user's own ID. Previously it was just `searchParams.get('userId') !== null`,
+  // which meant visiting /profile?userId=<your-own-id> would hide the Edit button.
+  const viewedIdParam = searchParams.get('userId')
+  const isViewingOtherProfile =
+    viewedIdParam !== null &&
+    viewedIdParam !== 'null' &&
+    viewedIdParam !== String(authUser?.id)
+
+  // FIX: userRole is now derived from the loaded `user` object (after the API
+  // call completes) with a fallback to authUser. Previously it was only
+  // computed from authUser, so when viewing another user's profile the role
+  // was always the *viewer's* role, causing wrong fields to show/hide.
+  const userRole = user?.role ?? authUser?.role ?? localStorage.getItem('role')
 
   const syncProfileState = (profile) => {
     setUser(profile)
@@ -38,12 +53,17 @@ export default function MyProfile() {
     })
   }
 
-  const loadUserProfile = async (id) => {
+  const loadUserProfile = useCallback(async (id) => {
     const response = await getUserById(id)
-    return response.data
-  }
+    const payload = response.data
+    // Handle both flat { name, email, role, ... } and wrapped { data: { ... } } responses
+    if (payload && typeof payload === 'object' && !payload.name && !payload.email && payload.data) {
+      return payload.data
+    }
+    return payload
+  }, [])
 
-  const refreshUserProfile = async () => {
+  const refreshUserProfile = useCallback(async () => {
     if (!userId) {
       setError('Unable to load profile because no user is signed in.')
       setLoading(false)
@@ -56,31 +76,30 @@ export default function MyProfile() {
       syncProfileState(profile)
     } catch (err) {
       console.error('Error fetching profile:', err)
-      setError(err.response?.data?.message || err.response?.data || 'Failed to load profile information.')
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!userId) {
-        setError('Unable to load profile because no user is signed in.')
-        setLoading(false)
-        return
-      }
-
-      setError('')
-      try {
-        const profile = await loadUserProfile(userId)
-        syncProfileState(profile)
-      } catch (err) {
-        console.error('Error fetching profile:', err)
+      const status = err?.response?.status
+      if (status === 401) {
+        setError('Session expired. Please log in again.')
+      } else if (status === 404) {
+        setError('Profile not found. Please contact support.')
+      } else {
         setError(err.response?.data?.message || err.response?.data || 'Failed to load profile information.')
       }
+    } finally {
       setLoading(false)
     }
+  }, [userId, loadUserProfile])
 
-    fetchProfile()
+  useEffect(() => {
+    if (!userId) {
+      setError('Unable to load profile because no user is signed in.')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    refreshUserProfile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   const handleSubmit = async (e) => {
@@ -93,7 +112,19 @@ export default function MyProfile() {
     setSubmitting(true)
     setError('')
     try {
-      await updateUserProfile(userId, form)
+      const profilePayload = {
+        phone: form.phone,
+        address: form.address,
+        skills: form.skills,
+        experience: form.experience,
+        education: form.education,
+        company: form.company,
+        currentRole: form.currentRole,
+        linkedinUrl: form.linkedinUrl,
+        website: form.website,
+      }
+
+      await updateUserProfile(userId, profilePayload)
       setSuccess(true)
       setEditing(false)
       await refreshUserProfile()
@@ -145,14 +176,40 @@ export default function MyProfile() {
     )
   }
 
+  // FIX: Show a clear error screen if user failed to load (e.g. API down),
+  // instead of rendering a broken page with all-empty fields.
+  if (!user && error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8 max-w-md w-full text-center">
+          <svg className="w-12 h-12 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Could not load profile</h2>
+          <p className="text-gray-500 text-sm">{error}</p>
+          <button
+            onClick={() => { setError(''); setLoading(true); refreshUserProfile(); }}
+            className="mt-6 bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold px-6 py-2 rounded-xl transition"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
 
       {/* Header */}
       <div className="bg-gradient-to-r from-deep-teal-600 to-deep-teal-700 text-white py-8 sm:py-10 md:py-12 px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">{isViewingOtherProfile ? `${user?.name}'s Profile` : 'My Profile'}</h1>
-          <p className="text-deep-teal-100 mt-1 text-sm sm:text-base">{isViewingOtherProfile ? 'View profile information' : 'Manage your professional information'}</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+            {isViewingOtherProfile ? `${user?.name}'s Profile` : 'My Profile'}
+          </h1>
+          <p className="text-deep-teal-100 mt-1 text-sm sm:text-base">
+            {isViewingOtherProfile ? 'View profile information' : 'Manage your professional information'}
+          </p>
         </div>
       </div>
 
@@ -204,12 +261,12 @@ export default function MyProfile() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <p className="text-gray-800 capitalize">{user?.role}</p>
+                <p className="text-gray-800 capitalize">{user?.role?.toLowerCase()}</p>
               </div>
             </div>
           </div>
 
-          {/* Profile Form */}
+          {/* Profile Form or Display */}
           {!isViewingOtherProfile && editing ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-800">Edit Profile Information</h3>
@@ -217,25 +274,15 @@ export default function MyProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Enter your full name"
-                    required
-                  />
+                  <p className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                    {user?.name}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-deep-teal-500 transition"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="Enter your email address"
-                    required
-                  />
+                  <p className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                    {user?.email}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
@@ -348,19 +395,8 @@ export default function MyProfile() {
                   onClick={() => {
                     setEditing(false)
                     setError('')
-                    setForm({
-                      name: user?.name || '',
-                      email: user?.email || '',
-                      phone: user?.phone || '',
-                      address: user?.address || '',
-                      skills: user?.skills || '',
-                      experience: user?.experience || '',
-                      education: user?.education || '',
-                      company: user?.company || '',
-                      currentRole: user?.currentRole || '',
-                      linkedinUrl: user?.linkedinUrl || '',
-                      website: user?.website || ''
-                    })
+                    // Reset form back to current saved values
+                    syncProfileState(user)
                   }}
                   className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-6 py-3 rounded-xl transition"
                 >
@@ -436,6 +472,19 @@ export default function MyProfile() {
                     )}
                   </>
                 )}
+
+                {/* Empty state when no extra info is filled in yet */}
+                {!user?.phone && !user?.address && !user?.skills && !user?.experience && !user?.education &&
+                  !(userRole === 'RECRUITER' && (user?.company || user?.currentRole || user?.linkedinUrl || user?.website)) && (
+                  <div className="md:col-span-2 text-center py-8 text-gray-400">
+                    <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <p className="text-sm">
+                      {isViewingOtherProfile ? 'No additional information provided.' : 'No profile details yet. Click "Edit Profile" to add your information.'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -445,7 +494,7 @@ export default function MyProfile() {
             <div className="mt-8 pt-6 border-t border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Resume</h3>
               {user?.resumeFileName ? (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -458,10 +507,23 @@ export default function MyProfile() {
                   >
                     Download
                   </button>
+                  {!isViewingOtherProfile && (
+                    <label className="cursor-pointer bg-gray-50 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition inline-block">
+                      Update Resume
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleResumeUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-500 mb-3">{isViewingOtherProfile ? 'No resume uploaded' : 'No resume uploaded yet'}</p>
+                  <p className="text-gray-500 mb-3">
+                    {isViewingOtherProfile ? 'No resume uploaded.' : 'No resume uploaded yet.'}
+                  </p>
                   {!isViewingOtherProfile && (
                     <label className="cursor-pointer bg-deep-teal-50 text-deep-teal-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-deep-teal-100 transition inline-block">
                       Upload Resume
@@ -473,19 +535,6 @@ export default function MyProfile() {
                       />
                     </label>
                   )}
-                </div>
-              )}
-              {!isViewingOtherProfile && editing && user?.resumeFileName && (
-                <div className="mt-4">
-                  <label className="cursor-pointer bg-gray-50 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition inline-block">
-                    Update Resume
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleResumeUpload}
-                      className="hidden"
-                    />
-                  </label>
                 </div>
               )}
             </div>

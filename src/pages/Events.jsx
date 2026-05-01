@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { createEvent, getEventsByRecruiter, getEventApplications, updateEventApplicationStatus } from '../services/api'
 
 export default function Events() {
+  const { user } = useAuth()
   const [events, setEvents] = useState([])
   const [selectedEventApplications, setSelectedEventApplications] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -14,11 +16,13 @@ export default function Events() {
     title: '', description: '', location: '', eventDate: '', organizer: '', requirements: ''
   })
 
-  // Get recruiter ID from localStorage (assuming it's stored during login)
-  const recruiterId = localStorage.getItem('id')
+  const recruiterId = user?.id
 
   const fetchEvents = useCallback(async () => {
-    if (!recruiterId) return
+    if (!recruiterId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const response = await getEventsByRecruiter(recruiterId)
