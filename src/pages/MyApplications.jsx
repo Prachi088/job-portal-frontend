@@ -36,16 +36,16 @@ function SkeletonAppCard() {
 
 /* ── Status badge config ───────────────────────────────── */
 const STATUS_CONFIG = {
-  APPLIED:  { bg: 'var(--primary-dim)',   text: 'var(--primary)',  border: 'rgba(61,122,111,0.25)', icon: '📋' },
+  APPLIED:  { bg: 'var(--primary-dim)',   text: 'var(--primary)',  border: 'rgba(79,70,229,0.25)', icon: '📋' },
   ACCEPTED: { bg: 'var(--success-bg)',    text: 'var(--success)',  border: 'var(--success-border)', icon: '✅' },
   REJECTED: { bg: 'var(--error-bg)',      text: 'var(--error)',    border: 'var(--error-border)',   icon: '✗' },
   default:  { bg: 'var(--bg-subtle)',     text: 'var(--text-muted)', border: 'var(--border)',       icon: '·' },
 }
 
 const COMPANY_COLORS = [
-  { bg: '#E8F2F0', text: '#3D7A6F' },
-  { bg: '#F2DDD5', text: '#C2826A' },
-  { bg: '#EBF7F1', text: '#2D7A5A' },
+  { bg: '#EEF2FF', text: '#4F46E5' },
+  { bg: '#FEF3C7', text: '#D97706' },
+  { bg: '#ECFDF5', text: '#059669' },
   { bg: '#F3EFFB', text: '#6B4CAB' },
   { bg: '#D2EBF8', text: '#1A6B9A' },
 ]
@@ -90,7 +90,7 @@ export default function MyApplications() {
     <div style={{ minHeight:'100vh', background:'var(--bg)' }}>
 
       {/* ── Page header ── */}
-      <div style={{ background:'linear-gradient(145deg, #2A5F55 0%, #3D7A6F 100%)', color:'#fff', padding:'clamp(28px, 6vw, 52px) clamp(16px, 4vw, 32px)' }}>
+      <div style={{ background:'linear-gradient(145deg, #1E1B4B 0%, #4F46E5 100%)', color:'#fff', padding:'clamp(28px, 6vw, 52px) clamp(16px, 4vw, 32px)' }}>
         <div style={{ maxWidth:960, margin:'0 auto' }}>
           <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
             <div style={{ width:36, height:36, background:'rgba(255,255,255,0.15)', borderRadius:'var(--r-md)', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -116,7 +116,7 @@ export default function MyApplications() {
             [1,2,3,4].map(i => <SkeletonStatCard key={i} />)
           ) : (
             [
-              { label:'Total Applied', value:counts.total,    color:'var(--primary)', icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg>, bg:'var(--primary-dim)', border:'rgba(61,122,111,0.2)' },
+              { label:'Total Applied', value:counts.total,    color:'var(--primary)', icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg>, bg:'var(--primary-dim)', border:'rgba(79,70,229,0.2)' },
               { label:'Accepted',      value:counts.accepted, color:'var(--success)', icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, bg:'var(--success-bg)', border:'var(--success-border)' },
               { label:'Pending',       value:counts.pending,  color:'#6B4CAB', icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, bg:'#F3EFFB', border:'#CBBCE8' },
               { label:'Rejected',      value:counts.rejected, color:'var(--error)', icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>, bg:'var(--error-bg)', border:'var(--error-border)' },

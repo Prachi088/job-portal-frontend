@@ -58,17 +58,17 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-deep-teal-50 to-deep-teal-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-7">
 
         {/* Logo */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white text-deep-teal-600 rounded-3xl mb-6 shadow-lg">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-deep-teal-600 text-white rounded-3xl mb-4 shadow-lg">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-          <p className="text-gray-600 text-lg">Join JobPortal today</p>
+          <h1 className="text-2xl font-medium text-gray-800 mb-1">Create Account</h1>
+          <p className="text-gray-600 text-sm">Join the SATI Alumni Portal</p>
         </div>
 
         {error && (
@@ -77,7 +77,7 @@ export default function Register() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <input
@@ -135,12 +135,12 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="block text-base font-semibold text-gray-700 mb-3">I am a</label>
-            <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">I am a</label>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setForm({ ...form, role: 'STUDENT' })}
-                className={`py-4 px-4 rounded-xl border-2 font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                className={`py-3 px-3 rounded-xl border-2 font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm ${
                   form.role === 'STUDENT'
                     ? 'border-deep-teal-600 bg-deep-teal-50 text-deep-teal-700 shadow-md'
                     : 'border-gray-300 text-gray-600 hover:border-deep-teal-400 hover:bg-gray-50'
@@ -154,7 +154,7 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setForm({ ...form, role: 'RECRUITER' })}
-                className={`py-4 px-4 rounded-xl border-2 font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                className={`py-3 px-3 rounded-xl border-2 font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm ${
                   form.role === 'RECRUITER'
                     ? 'border-deep-teal-600 bg-deep-teal-50 text-deep-teal-700 shadow-md'
                     : 'border-gray-300 text-gray-600 hover:border-deep-teal-400 hover:bg-gray-50'
@@ -196,13 +196,13 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg text-lg"
+            className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg text-sm"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="text-center text-gray-600 mt-8 text-base">
+        <p className="text-center text-gray-600 mt-5 text-sm">
           Already have an account?{' '}
           <Link to="/login" className="text-deep-teal-600 font-semibold hover:underline hover:text-deep-teal-700 transition-colors">
             Sign In

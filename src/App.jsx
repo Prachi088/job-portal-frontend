@@ -21,6 +21,7 @@ import Events from "./pages/Events";
 import MyApplications from "./pages/MyApplications";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
 import MyProfile from "./pages/MyProfile";
+import JobDetails from "./pages/JobDetails";
 
 // FIX: was importing from Sharedpages_ (stub placeholders that just render
 // bare text like "Connected", "Requests" etc.).  The real styled pages
@@ -31,7 +32,6 @@ import { Connected, Requests, MyJobs, MyEvents } from "./pages/SharedPages";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ChatBox from "./components/ChatBox";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -84,7 +84,7 @@ function ParticleBackground() {
     let raf;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#3D7A6F";
+      ctx.fillStyle = "#4F46E5";
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
@@ -188,6 +188,7 @@ function Layout() {
             <Route path="/register" element={<Register />} />
 
             <Route path="/jobs" element={<ProtectedRoute><JobListings /></ProtectedRoute>} />
+            <Route path="/jobs/:id" element={<ProtectedRoute><JobDetails /></ProtectedRoute>} />
             <Route path="/my-applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
             <Route path="/chat" element={<Navigate to="/jobs" replace />} />
@@ -207,14 +208,6 @@ function Layout() {
 
       <Footer />
 
-      {/*
-        ChatBox is NOT wrapped in ProtectedRoute.
-        ProtectedRoute renders <p>Loading...</p> while auth is initialising,
-        which means the "open-chatbox" event fired from the Navbar lands on an
-        unmounted ChatBox and is silently lost. Instead ChatBox reads `user`
-        directly and returns null if not logged in — no race condition.
-      */}
-      {!hideNav && <ChatBox />}
     </div>
   );
 }

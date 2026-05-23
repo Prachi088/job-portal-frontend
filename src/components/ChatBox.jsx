@@ -257,7 +257,7 @@ const styles = {
     borderRadius: "50%",
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 20px rgba(61,122,111,0.4)",
+    boxShadow: "0 4px 20px rgba(79,70,229,0.4)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

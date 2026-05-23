@@ -42,16 +42,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-deep-teal-50 to-deep-teal-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-7">
 
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white text-deep-teal-600 rounded-3xl mb-6 shadow-lg">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-deep-teal-600 text-white rounded-3xl mb-4 shadow-lg">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-600 text-lg">Sign in to your JobPortal account</p>
+          <h1 className="text-2xl font-medium text-gray-800 mb-1">Welcome Back</h1>
+          <p className="text-gray-600 text-sm">Sign in to your Alumni Portal account</p>
         </div>
 
         {error && (
@@ -60,7 +60,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
@@ -106,13 +106,13 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg text-lg"
+            className="w-full bg-deep-teal-600 hover:bg-deep-teal-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg text-sm"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-gray-600 mt-8 text-base">
+        <p className="text-center text-gray-600 mt-5 text-sm">
           Don't have an account?{' '}
           <Link to="/register" className="text-deep-teal-600 font-semibold hover:underline hover:text-deep-teal-700 transition-colors">
             Sign Up

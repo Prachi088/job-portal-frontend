@@ -79,18 +79,6 @@ export default function Navbar() {
             <NavLink key={to} to={to} active={isActive(to)} label={label} />
           ))}
 
-          {user?.role !== "RECRUITER" && (
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent("open-chatbox"))}
-              style={styles.chatBtn}
-              className="nav-chat-btn"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              AI Chat
-            </button>
-          )}
         </div>
 
         {/* ── Desktop right ── */}
@@ -181,20 +169,6 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {user?.role !== "RECRUITER" && (
-            <button
-              onClick={() => {
-                setMobileOpen(false);
-                window.dispatchEvent(new CustomEvent("open-chatbox"));
-              }}
-              style={styles.drawerChatBtn}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              AI Career Assistant
-            </button>
-          )}
         </div>
 
         {/* Drawer footer */}
@@ -316,7 +290,7 @@ const styles = {
     gap: 7,
     background: "var(--primary-dim)",
     color: "var(--primary)",
-    border: "1.5px solid rgba(61,122,111,0.22)",
+    border: "1.5px solid rgba(79,70,229,0.22)",
     padding: "6px 14px",
     borderRadius: "var(--r-md)",
     fontSize: "13.5px",
@@ -337,7 +311,7 @@ const styles = {
     width: 32,
     height: 32,
     background: "var(--primary-dim)",
-    border: "1.5px solid rgba(61,122,111,0.25)",
+    border: "1.5px solid rgba(79,70,229,0.25)",
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",
@@ -493,7 +467,7 @@ const styles = {
     width: "100%",
     marginTop: 4,
     transition: "all 0.15s",
-    borderLeft: "3px solid rgba(61,122,111,0.3)",
+    borderLeft: "3px solid rgba(79,70,229,0.3)",
   },
   drawerFooter: {
     padding: "12px 12px 20px",

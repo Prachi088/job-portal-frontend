@@ -33,6 +33,7 @@ export const loginUser = (data) => API.post('/auth/login', data);
 export const getJobs = () => API.get('/jobs');
 export const createJob = (data) => API.post('/jobs', data);
 export const searchJobs = (title) => API.get(`/jobs/search?title=${title}`);
+export const getJobById = (id) => API.get(`/jobs/${id}`);
 export const applyForJob = (data) => API.post('/api/applications', data);
 export const getMyApplications = (userId) => API.get(`/api/applications/user/${userId}`);
 export const getAllApplications = () => API.get('/api/applications');

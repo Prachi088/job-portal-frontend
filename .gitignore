@@ -1,6 +1,7 @@
 # Logs
 logs
-*.log
+*.logIntroducing GPT-5.5
+GPT-5.5 is now available in Codex. It's our strongest
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

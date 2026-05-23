@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getJobs, searchJobs, applyForJob, getAllEvents, registerForEvent } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -38,11 +39,11 @@ function SkeletonList({ count = 4 }) {
 
 /* ── Company / organizer avatar ─────────────────────── */
 const AVATAR_COLORS = [
-  { bg: '#E8F2F0', text: '#3D7A6F' },
-  { bg: '#F2DDD5', text: '#C2826A' },
-  { bg: '#EBF7F1', text: '#2D7A5A' },
+  { bg: '#EEF2FF', text: '#4F46E5' },
+  { bg: '#FEF3C7', text: '#D97706' },
+  { bg: '#ECFDF5', text: '#059669' },
   { bg: '#F3EFFB', text: '#6B4CAB' },
-  { bg: '#FDF6E8', text: '#A07030' },
+  { bg: '#FEF3C7', text: '#A07030' },
 ]
 
 function getColorForStr(str = '') {
@@ -57,6 +58,30 @@ function BookmarkIcon({ filled }) {
       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
     </svg>
   )
+}
+
+function TabIcon({ name }) {
+  if (name === 'jobs') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
+        <rect x="2" y="7" width="20" height="14" rx="2" />
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+      </svg>
+    )
+  }
+
+  if (name === 'events') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    )
+  }
+
+  return null
 }
 
 /* ─────────────────────────────────────────────────────── */
@@ -216,7 +241,7 @@ export default function JobListings() {
 
       {/* ── Hero ── */}
       <div style={{
-        background: 'linear-gradient(145deg, #2A5F55 0%, #3D7A6F 45%, #4A9086 100%)',
+        background: 'linear-gradient(145deg, #1E1B4B 0%, #4F46E5 45%, #6366F1 100%)',
         color: '#fff',
         padding: 'clamp(32px, 8vw, 64px) clamp(16px, 5vw, 32px) clamp(24px, 6vw, 48px)',
         textAlign: 'center',
@@ -224,7 +249,7 @@ export default function JobListings() {
         overflow: 'hidden',
       }}>
         {/* subtle glow */}
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 50% at 50% 110%, rgba(194,130,106,0.18) 0%, transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 50% at 50% 110%, rgba(217,119,6,0.24) 0%, transparent 70%)', pointerEvents:'none' }} />
 
         <h1 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(1.7rem, 5vw, 2.8rem)', fontWeight:500, marginBottom:10, letterSpacing:'-0.5px', position:'relative' }}>
           Find Your Dream {activeTab === 'jobs' ? 'Job' : 'Event'}
@@ -255,9 +280,12 @@ export default function JobListings() {
                   color: activeTab === tab ? 'var(--primary)' : 'rgba(255,255,255,0.85)',
                   boxShadow: activeTab === tab ? '0 2px 12px rgba(28,36,34,0.15)' : 'none',
                   textTransform:'capitalize',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                 }}
               >
-                {tab === 'jobs' ? '💼 Jobs' : '📅 Events'}
+                <TabIcon name={tab} />
+                {tab === 'jobs' ? 'Jobs' : 'Events'}
               </button>
             ))}
           </div>
@@ -327,7 +355,7 @@ export default function JobListings() {
                 ...selectStyle,
                 background: showSaved ? 'var(--primary-dim)' : 'var(--bg-surface)',
                 color: showSaved ? 'var(--primary)' : 'var(--text-secondary)',
-                border: showSaved ? '1px solid rgba(61,122,111,0.3)' : '1px solid var(--border)',
+                border: showSaved ? '1px solid rgba(79,70,229,0.3)' : '1px solid var(--border)',
                 fontWeight: showSaved ? 600 : 400,
                 cursor:'pointer',
               }}
@@ -400,9 +428,21 @@ export default function JobListings() {
 
 /* ── Job Card ──────────────────────────────────────────── */
 function JobCard({ job, isSaved, isApplied, isApplying, onApply, onToggleSave }) {
+  const navigate = useNavigate()
   const colors = getColorForStr(job.company)
   return (
-    <div style={cardStyle} className="job-list-card">
+    <div
+      style={{
+        ...cardStyle,
+        cursor: 'pointer',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+      }}
+      className="job-list-card"
+      onClick={() => navigate(`/jobs/${job.id}`)}
+      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/jobs/${job.id}`) }}
+      role="button"
+      tabIndex={0}
+    >
       <div style={{ display:'flex', gap:14, flex:1, minWidth:0 }}>
         {/* Avatar */}
         <div style={{ width:46, height:46, borderRadius:12, background:colors.bg, color:colors.text, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontSize:18, fontWeight:500, flexShrink:0 }}>
@@ -441,7 +481,7 @@ function JobCard({ job, isSaved, isApplied, isApplying, onApply, onToggleSave })
             )}
           </div>
           {job.description && (
-            <p style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:8, lineHeight:1.6, WebkitLineClamp:2, display:'-webkit-box', WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+            <p style={{ fontSize:13, color:'var(--text-muted)', marginTop:8, lineHeight:1.75, display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', textOverflow:'ellipsis', minHeight: 'calc(3 * 1.75em)' }}>
               {job.description}
             </p>
           )}
@@ -451,12 +491,12 @@ function JobCard({ job, isSaved, isApplied, isApplying, onApply, onToggleSave })
       {/* Actions */}
       <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }} className="card-actions">
         <button
-          onClick={onToggleSave}
+          onClick={(e) => { e.stopPropagation(); onToggleSave() }}
           title={isSaved ? 'Remove from saved' : 'Save job'}
           style={{
             background: isSaved ? 'var(--accent-light)' : 'var(--bg-subtle)',
             color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
-            border: `1px solid ${isSaved ? 'rgba(194,130,106,0.3)' : 'var(--border)'}`,
+            border: `1px solid ${isSaved ? 'rgba(217,119,6,0.3)' : 'var(--border)'}`,
             borderRadius:'var(--r-md)',
             padding:'8px 10px',
             cursor:'pointer',
@@ -470,7 +510,7 @@ function JobCard({ job, isSaved, isApplied, isApplying, onApply, onToggleSave })
         </button>
 
         <button
-          onClick={onApply}
+          onClick={(e) => { e.stopPropagation(); onApply() }}
           disabled={isApplied || isApplying}
           style={{
             background: isApplied ? 'var(--success-bg)' : 'var(--primary)',
@@ -557,7 +597,7 @@ function EventCard({ event, isSaved, isRegistered, isRegistering, onRegister, on
           style={{
             background: isSaved ? 'var(--accent-light)' : 'var(--bg-subtle)',
             color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
-            border: `1px solid ${isSaved ? 'rgba(194,130,106,0.3)' : 'var(--border)'}`,
+            border: `1px solid ${isSaved ? 'rgba(217,119,6,0.3)' : 'var(--border)'}`,
             borderRadius:'var(--r-md)', padding:'8px 10px', cursor:'pointer',
             transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center',
           }}
