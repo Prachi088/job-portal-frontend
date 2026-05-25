@@ -27,7 +27,7 @@ export default function Login() {
         id: res.data.id,
       })
 
-      if (res.data.role === 'RECRUITER') {
+      if (String(res.data.role).toUpperCase().replace(/^ROLE_/, '') === 'RECRUITER') {
         navigate('/recruiter')
       } else {
         navigate('/jobs')

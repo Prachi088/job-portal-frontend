@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { createEvent, getEventsByRecruiter, getEventApplications, updateEventApplicationStatus } from '../services/api'
+import toast from 'react-hot-toast'
+import {
+  createEvent,
+  getEventsByRecruiter,
+  getEventApplications,
+  updateEventApplicationStatus,
+  deleteEvent,           // FIX #6: was never imported — events couldn't be deleted
+} from '../services/api'
 
 export default function Events() {
   const { user } = useAuth()
@@ -11,27 +18,47 @@ export default function Events() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [deletingEventId, setDeletingEventId] = useState(null)  // FIX #6: delete state
   const [success, setSuccess] = useState(false)
+  const [fetchError, setFetchError] = useState('')              // FIX #2: track API errors
   const [form, setForm] = useState({
     title: '', description: '', location: '', eventDate: '', organizer: '', requirements: ''
   })
 
   const recruiterId = user?.id
 
+  // ── FIX #3: Detect when recruiter ID is missing vs. genuine empty list ──────
+  // A null/undefined recruiterId means auth state is broken (JWT missing `id`
+  // claim and no stored id). We surface this rather than silently showing
+  // "No events created yet", which is completely misleading.
+  const idMissing = !recruiterId || recruiterId === 'null' || recruiterId === 'undefined'
+
   const fetchEvents = useCallback(async () => {
-    if (!recruiterId) {
+    if (idMissing) {
       setLoading(false)
       return
     }
     setLoading(true)
+    setFetchError('')
     try {
       const response = await getEventsByRecruiter(recruiterId)
-      setEvents(response.data)
+      setEvents(Array.isArray(response.data) ? response.data : [])
     } catch (err) {
       console.error('Error fetching events:', err)
+      // FIX #2: previously only console.error'd — user saw empty state with no clue why
+      const status = err.response?.status
+      if (status === 401 || status === 403) {
+        setFetchError('Session expired or unauthorized. Please sign in again.')
+      } else if (status === 404) {
+        // 404 on a list endpoint typically means "no records" — treat as empty
+        setEvents([])
+      } else {
+        setFetchError('Could not load your events. Check your connection and try again.')
+      }
+      toast.error('Failed to load events.')
     }
     setLoading(false)
-  }, [recruiterId])
+  }, [recruiterId, idMissing])
 
   useEffect(() => {
     fetchEvents()
@@ -39,6 +66,10 @@ export default function Events() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (idMissing) {
+      toast.error('Please sign in again as a recruiter.')
+      return
+    }
     setSubmitting(true)
     try {
       const eventData = {
@@ -51,35 +82,76 @@ export default function Events() {
       setForm({ title: '', description: '', location: '', eventDate: '', organizer: '', requirements: '' })
       setShowForm(false)
       fetchEvents()
+      toast.success('Event created successfully!')
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       console.error('Error creating event:', err)
+      const msg = err.response?.data?.message || err.response?.data || 'Could not create event.'
+      toast.error(msg)
     }
     setSubmitting(false)
+  }
+
+  // ── FIX #6: Delete event handler (was completely missing) ───────────────────
+  const handleDeleteEvent = async (event) => {
+    if (!window.confirm(`Delete "${event.title}"? This cannot be undone.`)) return
+    setDeletingEventId(event.id)
+    try {
+      await deleteEvent(event.id)
+      setEvents((prev) => prev.filter((e) => e.id !== event.id))
+      toast.success('Event deleted.')
+    } catch (err) {
+      console.error('Error deleting event:', err)
+      toast.error('Could not delete event.')
+    }
+    setDeletingEventId(null)
   }
 
   const handleViewApplications = async (event) => {
     try {
       const response = await getEventApplications(event.id)
-      setSelectedEventApplications(response.data)
+      setSelectedEventApplications(Array.isArray(response.data) ? response.data : [])
       setSelectedEvent(event)
       setShowApplicationsModal(true)
     } catch (err) {
       console.error('Error fetching event applications:', err)
+      toast.error('Could not load registrations.')
     }
   }
 
   const handleUpdateApplicationStatus = async (applicationId, status) => {
     try {
       await updateEventApplicationStatus(applicationId, status)
-      // Refresh applications
       if (selectedEvent) {
         const response = await getEventApplications(selectedEvent.id)
-        setSelectedEventApplications(response.data)
+        setSelectedEventApplications(Array.isArray(response.data) ? response.data : [])
       }
+      toast.success(`Status updated to ${status.toLowerCase()}.`)
     } catch (err) {
       console.error('Error updating application status:', err)
+      toast.error('Could not update status.')
     }
+  }
+
+  // ── FIX #3: Render a clear auth-error state when ID is missing ──────────────
+  if (idMissing) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Session Issue</h2>
+          <p className="text-gray-500 text-sm">
+            Your user ID could not be resolved from the current session.
+            Please sign out and sign back in to fix this.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -110,6 +182,23 @@ export default function Events() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             Event created successfully!
+          </div>
+        )}
+
+        {/* FIX #2: Show API fetch error instead of silent empty state */}
+        {fetchError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {fetchError}
+            <button
+              onClick={fetchEvents}
+              className="ml-auto underline font-medium hover:no-underline"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -201,7 +290,7 @@ export default function Events() {
           <div className="flex justify-center py-20">
             <div className="w-10 h-10 border-4 border-deep-teal-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ) : events.length === 0 ? (
+        ) : events.length === 0 && !fetchError ? (
           <div className="text-center py-20 text-gray-400">
             <p className="text-lg font-medium">No events created yet</p>
             <p className="text-sm mt-1">Click "Create Event" to get started</p>
@@ -220,10 +309,13 @@ export default function Events() {
                     </div>
                     <p className="text-gray-500 text-sm mt-2">{event.description}</p>
                     {event.requirements && (
-                      <p className="text-gray-500 text-sm mt-1"><strong>Requirements:</strong> {event.requirements}</p>
+                      <p className="text-gray-500 text-sm mt-1">
+                        <strong>Requirements:</strong> {event.requirements}
+                      </p>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-2">
+                  {/* FIX #6: Added delete button alongside view registrations */}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
                     <span className="bg-green-50 text-green-600 text-xs font-medium px-3 py-1 rounded-full border border-green-200">
                       Active
                     </span>
@@ -232,6 +324,29 @@ export default function Events() {
                       className="text-deep-teal-600 hover:text-deep-teal-700 text-sm font-medium underline"
                     >
                       View Registrations
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEvent(event)}
+                      disabled={deletingEventId === event.id}
+                      className="flex items-center gap-1 text-red-500 hover:text-red-700 text-sm font-medium disabled:opacity-40 transition"
+                    >
+                      {deletingEventId === event.id ? (
+                        <>
+                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                          Deleting…
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

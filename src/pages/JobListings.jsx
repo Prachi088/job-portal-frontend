@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getJobs, searchJobs, applyForJob, getAllEvents, registerForEvent } from '../services/api'
+import { getJobs, searchJobs, applyForJob, getAllEvents, registerForEvent, getMyApplications } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -136,6 +136,22 @@ export default function JobListings() {
     setSavedEvents(JSON.parse(localStorage.getItem('savedEvents') || '[]'))
   }, [])
 
+  // Fetch user's existing applications on component mount
+  useEffect(() => {
+    const fetchUserApplications = async () => {
+      try {
+        const res = await getMyApplications(user?.id)
+        if (res?.data) {
+          const appliedJobIds = res.data.map(app => app.jobId)
+          setApplied(appliedJobIds)
+        }
+      } catch (err) {
+        console.error('Error fetching user applications:', err)
+      }
+    }
+    if (user?.id) fetchUserApplications()
+  }, [user?.id])
+
   useEffect(() => { localStorage.setItem('savedJobs', JSON.stringify(savedJobs)) }, [savedJobs])
   useEffect(() => { localStorage.setItem('savedEvents', JSON.stringify(savedEvents)) }, [savedEvents])
 
@@ -162,7 +178,7 @@ export default function JobListings() {
   }
 
   const handleApply = async (jobId) => {
-    if (!jobId) return
+    if (!jobId || applied.includes(jobId)) return
     setApplying(jobId)
     try {
       await applyForJob({ userId: user?.id, jobId })

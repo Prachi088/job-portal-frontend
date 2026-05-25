@@ -23,14 +23,12 @@ import RecruiterDashboard from "./pages/RecruiterDashboard";
 import MyProfile from "./pages/MyProfile";
 import JobDetails from "./pages/JobDetails";
 
-// FIX: was importing from Sharedpages_ (stub placeholders that just render
-// bare text like "Connected", "Requests" etc.).  The real styled pages
-// with proper UI live in SharedPages.jsx — import from there instead.
 import { Connected, Requests, MyJobs, MyEvents } from "./pages/SharedPages";
 
 // Components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ChatBox from "./components/ChatBox";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -164,7 +162,6 @@ function DashboardRedirect() {
 
 function Layout() {
   const location = useLocation();
-  const { user } = useAuth();
   const hideNav = ["/login", "/register", "/about"].includes(location.pathname);
 
   useEffect(() => {
@@ -207,6 +204,7 @@ function Layout() {
       </div>
 
       <Footer />
+      <ChatBox />
 
     </div>
   );

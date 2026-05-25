@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+ import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext();
 
@@ -20,12 +20,43 @@ function parseIdFromJwt(token) {
     if (parts.length !== 3) return null;
     // base64url → base64 → JSON
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-    // Return whichever claim is a non-empty, non-object value
-    const id = payload.id ?? payload.userId ?? payload.sub ?? null;
-    return id !== null && id !== undefined ? String(id) : null;
+
+    // FIX #1 (CRITICAL): Only use claims that look like a numeric user ID.
+    // Spring Boot JWT typically puts the username/email in `sub`, NOT a
+    // numeric database ID. If we fall through to `sub`, we'd store the email
+    // as user.id, and every recruiter-specific API call (/jobs/recruiter/email)
+    // would fail with a 400/404 — causing both the Recruiter Dashboard and the
+    // Events page to silently show an empty state.
+    //
+    // Priority: explicit `id` or `userId` claim → numeric-looking `sub` →
+    // null (let the caller surface the error rather than using the wrong value).
+    const explicitId = payload.id ?? payload.userId ?? null;
+    if (explicitId !== null && explicitId !== undefined) {
+      return String(explicitId);
+    }
+
+    // Only accept `sub` if it looks like a numeric ID (digits only).
+    const sub = payload.sub ?? null;
+    if (sub !== null && /^\d+$/.test(String(sub))) {
+      return String(sub);
+    }
+
+    // `sub` is an email or username — DO NOT use it as the user ID.
+    if (sub !== null) {
+      console.warn(
+        "[AuthContext] JWT `sub` claim looks like a username/email, not a numeric ID.",
+        "Your Spring Boot backend must add an explicit `id` or `userId` claim to the JWT.",
+        "Current sub:", sub
+      );
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+function normalizeRole(role) {
+  return role ? String(role).toUpperCase().replace(/^ROLE_/, "") : role;
 }
 
 export const AuthProvider = ({ children }) => {
@@ -34,7 +65,7 @@ export const AuthProvider = ({ children }) => {
     if (!token) return null;
 
     const name  = localStorage.getItem("name");
-    const role  = localStorage.getItem("role");
+    const role  = normalizeRole(localStorage.getItem("role"));
 
     // FIX: Previously, if the backend login response didn't include `id`,
     // localStorage stored the literal string "undefined", and the profile
@@ -56,6 +87,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(false);
   }, []);
 
@@ -72,7 +104,7 @@ export const AuthProvider = ({ children }) => {
     const userData = {
       token,
       name: data.name,
-      role: data.role,
+      role: normalizeRole(data.role),
       id,
     };
 

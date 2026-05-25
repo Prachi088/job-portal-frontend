@@ -17,7 +17,7 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    if (status === 401 || status === 403) {
+    if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
       localStorage.removeItem('token');
       localStorage.removeItem('name');
       localStorage.removeItem('role');
@@ -31,7 +31,36 @@ API.interceptors.response.use(
 export const registerUser = (data) => API.post('/auth/register', data);
 export const loginUser = (data) => API.post('/auth/login', data);
 export const getJobs = () => API.get('/jobs');
-export const createJob = (data) => API.post('/jobs', data);
+export const getJobsByRecruiter = async (recruiterId) => {
+  // FIX #4: 403 = genuine auth failure — do NOT silently retry with a different
+  // path prefix. That would mask "token expired" or "not a recruiter" errors and
+  // make both pages show empty state with no explanation.
+  // Only retry on 404/405, which means the route prefix differs between envs.
+  const config = { skipAuthRedirect: true };
+  try {
+    return await API.get(`/jobs/recruiter/${recruiterId}`, config);
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 404 || status === 405) {
+      return API.get(`/api/jobs/recruiter/${recruiterId}`, config);
+    }
+    throw error;
+  }
+};
+export const createJob = async (data) => {
+  // FIX #4: same — do not swallow 403 on job creation
+  const config = { skipAuthRedirect: true };
+  try {
+    return await API.post('/jobs', data, config);
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 404 || status === 405) {
+      return API.post('/api/jobs', data, config);
+    }
+    throw error;
+  }
+};
+export const deleteJob = (id) => API.delete(`/jobs/${id}`);
 export const searchJobs = (title) => API.get(`/jobs/search?title=${title}`);
 export const getJobById = (id) => API.get(`/jobs/${id}`);
 export const applyForJob = (data) => API.post('/api/applications', data);

@@ -59,9 +59,8 @@ export default function Footer() {
   ];
 
   const socialLinks = [
-    { label: "GitHub",   href: "https://github.com/",   icon: <GithubIcon />,   hoverColor: "var(--text-primary)" },
-    { label: "LinkedIn", href: "https://linkedin.com/",  icon: <LinkedinIcon />, hoverColor: "#0A66C2" },
-    { label: "Twitter",  href: "https://twitter.com/",   icon: <TwitterIcon />,  hoverColor: "#1DA1F2" },
+    { label: "GitHub",   href: "https://github.com/Prachi088",   icon: <GithubIcon />,   hoverColor: "var(--text-primary)" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/prachi-rajput-023985280",  icon: <LinkedinIcon />, hoverColor: "#0A66C2" },
   ];
 
   // FIX: Navigate then immediately scroll to top, accounting for Lenis.
