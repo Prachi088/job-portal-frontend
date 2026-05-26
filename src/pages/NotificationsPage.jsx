@@ -23,18 +23,23 @@ export default function NotificationsPage() {
   const [processing, setProcessing] = useState(new Set());
 
   useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
+    const fetchRequests = async (isRetry = false) => {
+      if (!isRetry) setLoading(true);
       try {
         const res = await getConnectionRequests(user.id);
         setRequests(res.data || []);
       } catch (err) {
+        if (err.response?.status === 429 && !isRetry) {
+          // Rate limited — wait 2s and retry once
+          setTimeout(() => fetchRequests(true), 2000);
+          return;
+        }
         console.error(err);
         toast.error("Failed to load notifications");
       }
       setLoading(false);
     };
-    fetch();
+    fetchRequests();
   }, [user.id]);
 
   const handleUpdate = async (id, status) => {
@@ -43,9 +48,6 @@ export default function NotificationsPage() {
       await updateConnectionRequest(id, status);
       setRequests(prev => prev.filter(r => r.id !== id));
       if (status === "ACCEPTED") {
-        // Clear stale localStorage so ConnectPage refetches fresh connection
-        // state when the user navigates back — this ensures the accepted user
-        // immediately shows as "Connected" and disappears from "People to Connect".
         localStorage.removeItem(`sentRequests_${user.id}`);
         toast.success("Connection accepted!");
       } else {

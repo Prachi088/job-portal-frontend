@@ -31,7 +31,7 @@ export default function Navbar() {
       } catch {}
     };
     fetchPending();
-    const interval = setInterval(fetchPending, 30000);
+    const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
