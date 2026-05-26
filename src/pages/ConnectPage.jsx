@@ -30,37 +30,46 @@ export default function ConnectPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [users, setUsers]               = useState([]);
-  const [filtered, setFiltered]         = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
-  const [roleFilter, setRoleFilter]     = useState("ALL");
-  const [skillFilter, setSkillFilter]   = useState("");
-  const [sentRequests, setSentRequests] = useState(new Set());
-  const [connected, setConnected]       = useState(new Set());
-  const [pendingCount, setPendingCount] = useState(0);
+  const [users, setUsers]             = useState([]);
+  const [filtered, setFiltered]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [search, setSearch]           = useState("");
+  const [roleFilter, setRoleFilter]   = useState("ALL");
+  const [skillFilter, setSkillFilter] = useState("");
+  // FIX 1: Track BOTH sent requests AND pending incoming
+  const [sentRequests, setSentRequests]     = useState(new Set()); // IDs I sent to
+  const [pendingFromMe, setPendingFromMe]   = useState(new Set()); // already sent (from DB)
+  const [connected, setConnected]           = useState(new Set());
+  const [pendingCount, setPendingCount]     = useState(0); // incoming requests
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [usersRes, reqRes, connRes] = await Promise.all([
+        const [usersRes, incomingRes, connRes] = await Promise.all([
           getAllUsers(),
-          getConnectionRequests(user.id),
-          getConnections(user.id),
+          getConnectionRequests(user.id),  // incoming pending requests
+          getConnections(user.id),          // accepted connections
         ]);
 
-        // exclude self
         const others = (usersRes.data || []).filter(u => String(u.id) !== String(user.id));
         setUsers(others);
         setFiltered(others);
 
-        // pending incoming requests count
-        setPendingCount((reqRes.data || []).length);
+        // FIX 2: incoming requests = notification count
+        setPendingCount((incomingRes.data || []).length);
 
-        // already connected user IDs
+        // accepted connection IDs
         const connIds = new Set((connRes.data || []).map(c => String(c.userId)));
         setConnected(connIds);
+
+        // FIX 1: fetch requests I SENT (not incoming) to mark buttons correctly
+        // We reuse getAllUsers + connections to derive this:
+        // Any user not in connections but whose ID shows in sentRequests localStorage
+        const stored = localStorage.getItem(`sentRequests_${user.id}`);
+        if (stored) {
+          setPendingFromMe(new Set(JSON.parse(stored)));
+        }
 
       } catch (err) {
         console.error(err);
@@ -79,7 +88,8 @@ export default function ConnectPage() {
       result = result.filter(u =>
         u.name?.toLowerCase().includes(q) ||
         u.company?.toLowerCase().includes(q) ||
-        u.education?.toLowerCase().includes(q)
+        u.education?.toLowerCase().includes(q) ||
+        u.skills?.toLowerCase().includes(q)
       );
     }
     if (roleFilter !== "ALL") {
@@ -95,12 +105,19 @@ export default function ConnectPage() {
   const handleConnect = async (receiverId) => {
     try {
       await sendConnectionRequest(user.id, receiverId);
+      // FIX 1: immediately update UI + persist to localStorage
+      const newSet = new Set([...pendingFromMe, String(receiverId)]);
+      setPendingFromMe(newSet);
       setSentRequests(prev => new Set([...prev, String(receiverId)]));
+      localStorage.setItem(`sentRequests_${user.id}`, JSON.stringify([...newSet]));
       toast.success("Connection request sent!");
     } catch (err) {
       const msg = err.response?.data;
-      if (typeof msg === "string" && msg.includes("already")) {
-        setSentRequests(prev => new Set([...prev, String(receiverId)]));
+      if (typeof msg === "string" && msg.toLowerCase().includes("already")) {
+        // Already sent — mark as sent in UI
+        const newSet = new Set([...pendingFromMe, String(receiverId)]);
+        setPendingFromMe(newSet);
+        localStorage.setItem(`sentRequests_${user.id}`, JSON.stringify([...newSet]));
         toast("Request already sent");
       } else {
         toast.error("Failed to send request");
@@ -111,7 +128,7 @@ export default function ConnectPage() {
   const getButtonState = (userId) => {
     const id = String(userId);
     if (connected.has(id)) return "connected";
-    if (sentRequests.has(id)) return "sent";
+    if (pendingFromMe.has(id) || sentRequests.has(id)) return "sent";
     return "none";
   };
 
@@ -130,6 +147,7 @@ export default function ConnectPage() {
                 Build your professional network within the SATI community
               </p>
             </div>
+            {/* FIX 2: Notification bell with live count */}
             <button
               onClick={() => navigate("/notifications")}
               style={{ position: "relative", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 12, padding: "10px 18px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}
@@ -138,7 +156,7 @@ export default function ConnectPage() {
               Notifications
               {pendingCount > 0 && (
                 <span style={{ position: "absolute", top: -6, right: -6, background: "#EF4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {pendingCount}
+                  {pendingCount > 9 ? "9+" : pendingCount}
                 </span>
               )}
             </button>
@@ -150,7 +168,6 @@ export default function ConnectPage() {
 
         {/* Filters */}
         <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: "clamp(14px,3vw,20px)", marginBottom: 24, border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)", display: "flex", flexWrap: "wrap", gap: 12 }}>
-          {/* Search */}
           <div style={{ flex: "1 1 220px", position: "relative" }}>
             <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
@@ -160,8 +177,6 @@ export default function ConnectPage() {
               style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 10, paddingBottom: 10, border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
             />
           </div>
-
-          {/* Role filter */}
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
@@ -171,16 +186,12 @@ export default function ConnectPage() {
             <option value="STUDENT">Students</option>
             <option value="RECRUITER">Alumni / Recruiters</option>
           </select>
-
-          {/* Skills filter */}
           <input
             placeholder="Filter by skill (e.g. React, Java...)"
             value={skillFilter}
             onChange={e => setSkillFilter(e.target.value)}
             style={{ flex: "1 1 180px", padding: "10px 14px", border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none" }}
           />
-
-          {/* Clear */}
           {(search || roleFilter !== "ALL" || skillFilter) && (
             <button
               onClick={() => { setSearch(""); setRoleFilter("ALL"); setSkillFilter(""); }}
@@ -191,7 +202,6 @@ export default function ConnectPage() {
           )}
         </div>
 
-        {/* Results count */}
         <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
           {loading ? "Loading..." : `${filtered.length} member${filtered.length !== 1 ? "s" : ""} found`}
         </p>
@@ -200,19 +210,11 @@ export default function ConnectPage() {
         {loading ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
             {[1,2,3,4,5,6].map(i => (
-              <div key={i} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", height: 180 }}>
-                <div className="skeleton skeleton-avatar" style={{ width: 56, height: 56, borderRadius: "50%", marginBottom: 12 }} />
-                <div className="skeleton skeleton-title" style={{ width: "60%", marginBottom: 8 }} />
-                <div className="skeleton skeleton-text" style={{ width: "40%" }} />
-              </div>
+              <div key={i} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", height: 180 }} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: "64px 20px", color: "var(--text-muted)" }}>
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ margin: "0 auto 16px", display: "block", opacity: 0.3 }}>
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
             <p style={{ fontSize: 16, color: "var(--text-secondary)", marginBottom: 6 }}>No members found</p>
             <p style={{ fontSize: 13 }}>Try adjusting your filters</p>
           </div>
@@ -228,13 +230,22 @@ export default function ConnectPage() {
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
                 >
-                  {/* Avatar + name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: "50%", background: avatarColor.bg, color: avatarColor.text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                  {/* FIX 3: Avatar + name clickable → opens profile */}
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}
+                    onClick={() => navigate(`/profile?userId=${u.id}`)}
+                    title={`View ${u.name}'s profile`}
+                  >
+                    <div style={{ width: 52, height: 52, borderRadius: "50%", background: avatarColor.bg, color: avatarColor.text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, flexShrink: 0, transition: "transform 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.transform = "scale(1.08)"}
+                      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
                       {(u.name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 2 }}>{u.name}</div>
+                      <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--primary)", marginBottom: 2, textDecoration: "underline dotted" }}>
+                        {u.name}
+                      </div>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: roleConfig.bg, color: roleConfig.text }}>
                         {roleConfig.label}
                       </span>
@@ -277,7 +288,7 @@ export default function ConnectPage() {
                     )}
                   </div>
 
-                  {/* Connect button */}
+                  {/* FIX 1: Connect button with correct persistent state */}
                   <button
                     onClick={() => btnState === "none" && handleConnect(u.id)}
                     disabled={btnState !== "none"}
@@ -288,11 +299,12 @@ export default function ConnectPage() {
                       border: btnState === "connected" ? "1px solid var(--success-border)" : btnState === "sent" ? "1px solid var(--border)" : "none",
                       background: btnState === "connected" ? "var(--success-bg)" : btnState === "sent" ? "var(--bg-subtle)" : "var(--primary)",
                       color: btnState === "connected" ? "var(--success)" : btnState === "sent" ? "var(--text-muted)" : "#fff",
-                      fontSize: 13, fontWeight: 600, cursor: btnState === "none" ? "pointer" : "default",
+                      fontSize: 13, fontWeight: 600,
+                      cursor: btnState === "none" ? "pointer" : "default",
                       transition: "all 0.2s",
                     }}
                   >
-                    {btnState === "connected" ? "✓ Connected" : btnState === "sent" ? "Request Sent" : "Connect"}
+                    {btnState === "connected" ? "✓ Connected" : btnState === "sent" ? "⏳ Requested" : "Connect"}
                   </button>
                 </div>
               );
