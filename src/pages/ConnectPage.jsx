@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   getAllUsers,
   sendConnectionRequest,
@@ -29,6 +29,7 @@ function getAvatarColor(name = "") {
 export default function ConnectPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [users, setUsers]             = useState([]);
   const [filtered, setFiltered]       = useState([]);
@@ -36,41 +37,53 @@ export default function ConnectPage() {
   const [search, setSearch]           = useState("");
   const [roleFilter, setRoleFilter]   = useState("ALL");
   const [skillFilter, setSkillFilter] = useState("");
-  // FIX 1: Track BOTH sent requests AND pending incoming
-  const [sentRequests, setSentRequests]     = useState(new Set()); // IDs I sent to
-  const [pendingFromMe, setPendingFromMe]   = useState(new Set()); // already sent (from DB)
-  const [connected, setConnected]           = useState(new Set());
-  const [pendingCount, setPendingCount]     = useState(0); // incoming requests
 
+  const [pendingFromMe, setPendingFromMe]       = useState(new Set());
+  const [connected, setConnected]               = useState(new Set());
+  const [pendingCount, setPendingCount]         = useState(0);
+  const [sentThisSession, setSentThisSession]   = useState(new Set());
+
+  // ── Initial full fetch ────────────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         const [usersRes, incomingRes, connRes] = await Promise.all([
           getAllUsers(),
-          getConnectionRequests(user.id),  // incoming pending requests
-          getConnections(user.id),          // accepted connections
+          getConnectionRequests(user.id),
+          getConnections(user.id),
         ]);
 
-        const others = (usersRes.data || []).filter(u => String(u.id) !== String(user.id));
+        const others = (usersRes.data || []).filter(
+          (u) => String(u.id) !== String(user.id)
+        );
         setUsers(others);
         setFiltered(others);
 
-        // FIX 2: incoming requests = notification count
         setPendingCount((incomingRes.data || []).length);
 
-        // accepted connection IDs
-        const connIds = new Set((connRes.data || []).map(c => String(c.userId)));
+        const connIds = new Set(
+          (connRes.data || []).map((c) => String(c.userId))
+        );
         setConnected(connIds);
 
-        // FIX 1: fetch requests I SENT (not incoming) to mark buttons correctly
-        // We reuse getAllUsers + connections to derive this:
-        // Any user not in connections but whose ID shows in sentRequests localStorage
         const stored = localStorage.getItem(`sentRequests_${user.id}`);
-        if (stored) {
-          setPendingFromMe(new Set(JSON.parse(stored)));
-        }
+        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
 
+        // Remove IDs now connected
+        for (const id of connIds) storedSet.delete(id);
+
+        // Remove IDs of people who sent US a request
+        const incomingIds = new Set(
+          (incomingRes.data || []).map((r) => String(r.senderId))
+        );
+        for (const id of incomingIds) storedSet.delete(id);
+
+        setPendingFromMe(storedSet);
+        localStorage.setItem(
+          `sentRequests_${user.id}`,
+          JSON.stringify([...storedSet])
+        );
       } catch (err) {
         console.error(err);
         toast.error("Failed to load users");
@@ -78,48 +91,101 @@ export default function ConnectPage() {
       setLoading(false);
     };
     fetchData();
-  }, [user.id]);
+  }, [user.id]); // eslint-disable-line
 
-  // filter whenever search/role/skill changes
+  // ── Refetch connection state on every navigation to this page ────────────
+  // useLocation detects same-tab navigation (e.g. back from NotificationsPage)
+  // so accepted connections update immediately without needing a tab switch.
+  useEffect(() => {
+    if (location.pathname !== "/connect") return;
+    const refreshState = async () => {
+      try {
+        const [incomingRes, connRes] = await Promise.all([
+          getConnectionRequests(user.id),
+          getConnections(user.id),
+        ]);
+        const connIds = new Set(
+          (connRes.data || []).map((c) => String(c.userId))
+        );
+        setConnected(connIds);
+        setPendingCount((incomingRes.data || []).length);
+
+        const stored = localStorage.getItem(`sentRequests_${user.id}`);
+        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+        for (const id of connIds) storedSet.delete(id);
+
+        const incomingIds = new Set(
+          (incomingRes.data || []).map((r) => String(r.senderId))
+        );
+        for (const id of incomingIds) storedSet.delete(id);
+
+        setPendingFromMe(storedSet);
+        localStorage.setItem(
+          `sentRequests_${user.id}`,
+          JSON.stringify([...storedSet])
+        );
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    refreshState();
+  }, [location.pathname, user.id]); // eslint-disable-line
+
+  // ── Filter ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let result = [...users];
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(u =>
-        u.name?.toLowerCase().includes(q) ||
-        u.company?.toLowerCase().includes(q) ||
-        u.education?.toLowerCase().includes(q) ||
-        u.skills?.toLowerCase().includes(q)
+      result = result.filter(
+        (u) =>
+          u.name?.toLowerCase().includes(q) ||
+          u.company?.toLowerCase().includes(q) ||
+          u.education?.toLowerCase().includes(q) ||
+          u.skills?.toLowerCase().includes(q)
       );
     }
     if (roleFilter !== "ALL") {
-      result = result.filter(u => u.role === roleFilter);
+      result = result.filter((u) => u.role === roleFilter);
     }
     if (skillFilter.trim()) {
       const q = skillFilter.toLowerCase();
-      result = result.filter(u => u.skills?.toLowerCase().includes(q));
+      result = result.filter((u) => u.skills?.toLowerCase().includes(q));
     }
     setFiltered(result);
   }, [search, roleFilter, skillFilter, users]);
 
+  // ── Send request ──────────────────────────────────────────────────────────
   const handleConnect = async (receiverId) => {
+    const id = String(receiverId);
+    if (sentThisSession.has(id) || pendingFromMe.has(id) || connected.has(id)) return;
+
+    setSentThisSession((prev) => new Set([...prev, id]));
+
     try {
       await sendConnectionRequest(user.id, receiverId);
-      // FIX 1: immediately update UI + persist to localStorage
-      const newSet = new Set([...pendingFromMe, String(receiverId)]);
+      const newSet = new Set([...pendingFromMe, id]);
       setPendingFromMe(newSet);
-      setSentRequests(prev => new Set([...prev, String(receiverId)]));
-      localStorage.setItem(`sentRequests_${user.id}`, JSON.stringify([...newSet]));
+      localStorage.setItem(
+        `sentRequests_${user.id}`,
+        JSON.stringify([...newSet])
+      );
       toast.success("Connection request sent!");
     } catch (err) {
       const msg = err.response?.data;
       if (typeof msg === "string" && msg.toLowerCase().includes("already")) {
-        // Already sent — mark as sent in UI
-        const newSet = new Set([...pendingFromMe, String(receiverId)]);
+        const newSet = new Set([...pendingFromMe, id]);
         setPendingFromMe(newSet);
-        localStorage.setItem(`sentRequests_${user.id}`, JSON.stringify([...newSet]));
+        localStorage.setItem(
+          `sentRequests_${user.id}`,
+          JSON.stringify([...newSet])
+        );
         toast("Request already sent");
       } else {
+        setSentThisSession((prev) => {
+          const s = new Set(prev);
+          s.delete(id);
+          return s;
+        });
         toast.error("Failed to send request");
       }
     }
@@ -128,7 +194,7 @@ export default function ConnectPage() {
   const getButtonState = (userId) => {
     const id = String(userId);
     if (connected.has(id)) return "connected";
-    if (pendingFromMe.has(id) || sentRequests.has(id)) return "sent";
+    if (pendingFromMe.has(id) || sentThisSession.has(id)) return "sent";
     return "none";
   };
 
@@ -141,13 +207,12 @@ export default function ConnectPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
             <div>
               <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.5rem,4vw,2.2rem)", fontWeight: 500, marginBottom: 6 }}>
-                Connect with Alumni & Students
+                Connect with Alumni &amp; Students
               </h1>
               <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
                 Build your professional network within the SATI community
               </p>
             </div>
-            {/* FIX 2: Notification bell with live count */}
             <button
               onClick={() => navigate("/notifications")}
               style={{ position: "relative", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 12, padding: "10px 18px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}
@@ -173,13 +238,13 @@ export default function ConnectPage() {
             <input
               placeholder="Search by name, company, college..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 10, paddingBottom: 10, border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
             />
           </div>
           <select
             value={roleFilter}
-            onChange={e => setRoleFilter(e.target.value)}
+            onChange={(e) => setRoleFilter(e.target.value)}
             style={{ flex: "0 0 auto", padding: "10px 14px", border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13, background: "var(--bg-subtle)", color: "var(--text-primary)", cursor: "pointer", outline: "none" }}
           >
             <option value="ALL">All Roles</option>
@@ -189,7 +254,7 @@ export default function ConnectPage() {
           <input
             placeholder="Filter by skill (e.g. React, Java...)"
             value={skillFilter}
-            onChange={e => setSkillFilter(e.target.value)}
+            onChange={(e) => setSkillFilter(e.target.value)}
             style={{ flex: "1 1 180px", padding: "10px 14px", border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none" }}
           />
           {(search || roleFilter !== "ALL" || skillFilter) && (
@@ -206,10 +271,9 @@ export default function ConnectPage() {
           {loading ? "Loading..." : `${filtered.length} member${filtered.length !== 1 ? "s" : ""} found`}
         </p>
 
-        {/* User cards grid */}
         {loading ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-            {[1,2,3,4,5,6].map(i => (
+            {[1,2,3,4,5,6].map((i) => (
               <div key={i} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", height: 180 }} />
             ))}
           </div>
@@ -220,26 +284,24 @@ export default function ConnectPage() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-            {filtered.map(u => {
+            {filtered.map((u) => {
               const avatarColor = getAvatarColor(u.name);
-              const roleConfig = ROLE_COLORS[u.role] || ROLE_COLORS.STUDENT;
-              const btnState = getButtonState(u.id);
+              const roleConfig  = ROLE_COLORS[u.role] || ROLE_COLORS.STUDENT;
+              const btnState    = getButtonState(u.id);
 
               return (
-                <div key={u.id} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)", transition: "all 0.2s", display: "flex", flexDirection: "column", gap: 12 }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
+                <div
+                  key={u.id}
+                  style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)", transition: "all 0.2s", display: "flex", flexDirection: "column", gap: 12 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
                 >
-                  {/* FIX 3: Avatar + name clickable → opens profile */}
                   <div
                     style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}
                     onClick={() => navigate(`/profile?userId=${u.id}`)}
                     title={`View ${u.name}'s profile`}
                   >
-                    <div style={{ width: 52, height: 52, borderRadius: "50%", background: avatarColor.bg, color: avatarColor.text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, flexShrink: 0, transition: "transform 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.transform = "scale(1.08)"}
-                      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                    >
+                    <div style={{ width: 52, height: 52, borderRadius: "50%", background: avatarColor.bg, color: avatarColor.text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
                       {(u.name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div style={{ minWidth: 0 }}>
@@ -252,7 +314,6 @@ export default function ConnectPage() {
                     </div>
                   </div>
 
-                  {/* Details */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, color: "var(--text-muted)" }}>
                     {u.company && (
                       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -288,7 +349,6 @@ export default function ConnectPage() {
                     )}
                   </div>
 
-                  {/* FIX 1: Connect button with correct persistent state */}
                   <button
                     onClick={() => btnState === "none" && handleConnect(u.id)}
                     disabled={btnState !== "none"}
@@ -296,10 +356,23 @@ export default function ConnectPage() {
                       marginTop: "auto",
                       padding: "9px 0",
                       borderRadius: 10,
-                      border: btnState === "connected" ? "1px solid var(--success-border)" : btnState === "sent" ? "1px solid var(--border)" : "none",
-                      background: btnState === "connected" ? "var(--success-bg)" : btnState === "sent" ? "var(--bg-subtle)" : "var(--primary)",
-                      color: btnState === "connected" ? "var(--success)" : btnState === "sent" ? "var(--text-muted)" : "#fff",
-                      fontSize: 13, fontWeight: 600,
+                      border: btnState === "connected"
+                        ? "1px solid var(--success-border)"
+                        : btnState === "sent"
+                        ? "1px solid var(--border)"
+                        : "none",
+                      background: btnState === "connected"
+                        ? "var(--success-bg)"
+                        : btnState === "sent"
+                        ? "var(--bg-subtle)"
+                        : "var(--primary)",
+                      color: btnState === "connected"
+                        ? "var(--success)"
+                        : btnState === "sent"
+                        ? "var(--text-muted)"
+                        : "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
                       cursor: btnState === "none" ? "pointer" : "default",
                       transition: "all 0.2s",
                     }}

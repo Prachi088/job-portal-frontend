@@ -42,8 +42,17 @@ export default function NotificationsPage() {
     try {
       await updateConnectionRequest(id, status);
       setRequests(prev => prev.filter(r => r.id !== id));
-      toast.success(status === "ACCEPTED" ? "Connection accepted!" : "Request rejected");
+      if (status === "ACCEPTED") {
+        // Clear stale localStorage so ConnectPage refetches fresh connection
+        // state when the user navigates back — this ensures the accepted user
+        // immediately shows as "Connected" and disappears from "People to Connect".
+        localStorage.removeItem(`sentRequests_${user.id}`);
+        toast.success("Connection accepted!");
+      } else {
+        toast.success("Request rejected");
+      }
     } catch (err) {
+      console.error(err);
       toast.error("Failed to update request");
     }
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
@@ -94,12 +103,9 @@ export default function NotificationsPage() {
               const isProcessing = processing.has(req.id);
               return (
                 <div key={req.id} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: "clamp(14px,3vw,20px)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                  {/* Avatar */}
                   <div style={{ width: 48, height: 48, borderRadius: "50%", background: avatarColor.bg, color: avatarColor.text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
                     {(req.senderName || "?").charAt(0).toUpperCase()}
                   </div>
-
-                  {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 2 }}>
                       {req.senderName}
@@ -112,8 +118,6 @@ export default function NotificationsPage() {
                       Wants to connect with you
                     </div>
                   </div>
-
-                  {/* Actions */}
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
                       onClick={() => handleUpdate(req.id, "ACCEPTED")}

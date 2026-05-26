@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getConnections } from "../services/api";
 import toast from "react-hot-toast";
 
@@ -18,26 +18,35 @@ function getAvatarColor(name = "") {
 export default function ConnectionsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [connections, setConnections] = useState([]);
   const [filtered, setFiltered]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [search, setSearch]           = useState("");
 
+  const loadConnections = async () => {
+    setLoading(true);
+    try {
+      const res = await getConnections(user.id);
+      setConnections(res.data || []);
+      setFiltered(res.data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load connections");
+    }
+    setLoading(false);
+  };
+
+  // Initial load
   useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const res = await getConnections(user.id);
-        setConnections(res.data || []);
-        setFiltered(res.data || []);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load connections");
-      }
-      setLoading(false);
-    };
-    fetch();
-  }, [user.id]);
+    loadConnections();
+  }, [user.id]); // eslint-disable-line
+
+  // Refetch on every navigation to this page (same-tab navigation supported)
+  useEffect(() => {
+    if (location.pathname !== "/connected") return;
+    loadConnections();
+  }, [location.pathname]); // eslint-disable-line
 
   useEffect(() => {
     if (!search.trim()) { setFiltered(connections); return; }
