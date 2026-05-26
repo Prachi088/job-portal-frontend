@@ -96,3 +96,23 @@ export const registerForEvent = (eventId, userId) => API.post(`/api/events/${eve
 export const getEventApplications = (eventId) => API.get(`/api/events/${eventId}/applications`);
 export const getUserEventApplications = (userId) => API.get(`/api/events/user/${userId}/applications`);
 export const updateEventApplicationStatus = (applicationId, status) => API.put(`/api/events/applications/${applicationId}/status`, { status });
+
+// Connection APIs
+export const getAllUsers = () => API.get('/api/connections/users/all');
+export const sendConnectionRequest = (senderId, receiverId) =>
+  API.post('/api/connections/request', { senderId, receiverId });
+export const getConnectionRequests = (userId) =>
+  API.get(`/api/connections/requests/${userId}`);
+export const updateConnectionRequest = (id, status) =>
+  API.put(`/api/connections/request/${id}`, { status });
+export const getConnections = (userId) =>
+  API.get(`/api/connections/${userId}`);
+
+// Message APIs
+export const sendMsg = (data) => API.post('/api/messages', data);
+export const getConversation = (user1, user2) =>
+  API.get(`/api/messages/conversation/${user1}/${user2}`);
+export const markMessagesRead = (senderId, receiverId) =>
+  API.put(`/api/messages/read/${senderId}/${receiverId}`);
+export const getUnreadCount = (userId) =>
+  API.get(`/api/messages/unread/${userId}`);

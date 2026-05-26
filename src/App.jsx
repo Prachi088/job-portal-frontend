@@ -22,6 +22,10 @@ import MyApplications from "./pages/MyApplications";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
 import MyProfile from "./pages/MyProfile";
 import JobDetails from "./pages/JobDetails";
+import ConnectPage from "./pages/ConnectPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import ConnectionsPage from "./pages/ConnectionsPage";
+import ChatPage from "./pages/ChatPage";
 
 import { Connected, Requests, MyJobs, MyEvents } from "./pages/SharedPages";
 
@@ -38,54 +42,42 @@ let lenisInstance = null;
 
 function createLenis() {
   if (lenisInstance) return lenisInstance;
-
   const lenis = new Lenis({
     duration: 1.1,
     smoothWheel: true,
     prevent: (node) => node.hasAttribute("data-lenis-prevent"),
   });
-
   const handler = (time) => lenis.raf(time * 1000);
   lenis._rafHandler = handler;
   gsap.ticker.add(handler);
   lenis.on("scroll", ScrollTrigger.update);
-
   lenisInstance = lenis;
   window.__lenis__ = lenis;
-
   return lenis;
 }
 
 // ─── Background ────────────────────────────────────────
 function ParticleBackground() {
   const canvasRef = useRef(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     resize();
     window.addEventListener("resize", resize);
-
     const particles = Array.from({ length: 18 }, () => ({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
       vx: (Math.random() - 0.5) * 0.08,
       vy: (Math.random() - 0.5) * 0.08,
     }));
-
     let raf;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#4F46E5";
       particles.forEach((p) => {
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.vx; p.y += p.vy;
         if (p.x < 0) p.x = canvas.width;
         if (p.x > canvas.width) p.x = 0;
         if (p.y < 0) p.y = canvas.height;
@@ -96,21 +88,15 @@ function ParticleBackground() {
       });
       raf = requestAnimationFrame(draw);
     };
-
     draw();
-    return () => {
-      window.removeEventListener("resize", resize);
-      cancelAnimationFrame(raf);
-    };
+    return () => { window.removeEventListener("resize", resize); cancelAnimationFrame(raf); };
   }, []);
-
   return <canvas className="particle-canvas" ref={canvasRef} />;
 }
 
 // ─── Scroll bar ────────────────────────────────────────
 function ScrollProgressBar() {
   const barRef = useRef(null);
-
   useEffect(() => {
     const id = setInterval(() => {
       if (!lenisInstance || !barRef.current) return;
@@ -118,7 +104,6 @@ function ScrollProgressBar() {
     }, 16);
     return () => clearInterval(id);
   }, []);
-
   return <div ref={barRef} className="scroll-progress-bar" />;
 }
 
@@ -126,35 +111,26 @@ function ScrollProgressBar() {
 function AnimatedPage({ children }) {
   const ref = useRef(null);
   const loc = useLocation();
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
     if (lenisInstance && typeof lenisInstance.scrollTo === "function") {
       lenisInstance.scrollTo(0, { immediate: true });
     } else {
       window.scrollTo(0, 0);
     }
     ScrollTrigger.refresh();
-
     const ctx = gsap.context(() => {
-      gsap.fromTo(el,
-        { opacity: 0, y: 14 },
-        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }
-      );
+      gsap.fromTo(el, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" });
     }, ref);
-
     return () => ctx.revert();
   }, [loc.pathname]);
-
   return <div ref={ref}>{children}</div>;
 }
 
 // ─── Layout ────────────────────────────────────────────
 function DashboardRedirect() {
   const { user, loading } = useAuth();
-
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={user.role === "RECRUITER" ? "/recruiter" : "/jobs"} replace />;
@@ -164,9 +140,7 @@ function Layout() {
   const location = useLocation();
   const hideNav = ["/login", "/register", "/about"].includes(location.pathname);
 
-  useEffect(() => {
-    createLenis();
-  }, []);
+  useEffect(() => { createLenis(); }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -194,9 +168,14 @@ function Layout() {
             <Route path="/recruiter" element={<ProtectedRoute><RecruiterDashboard /></ProtectedRoute>} />
             <Route path="/dashboard" element={<DashboardRedirect />} />
             <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
-            <Route path="/connected" element={<ProtectedRoute><Connected /></ProtectedRoute>} />
             <Route path="/my-jobs" element={<ProtectedRoute><MyJobs /></ProtectedRoute>} />
             <Route path="/my-events" element={<ProtectedRoute><MyEvents /></ProtectedRoute>} />
+
+            {/* New networking routes */}
+            <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+            <Route path="/connected" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
+            <Route path="/chat/:otherId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/about" replace />} />
           </Routes>
@@ -205,7 +184,6 @@ function Layout() {
 
       <Footer />
       <ChatBox />
-
     </div>
   );
 }
