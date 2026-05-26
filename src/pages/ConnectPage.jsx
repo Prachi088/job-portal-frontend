@@ -5,6 +5,7 @@ import {
   getAllUsers,
   sendConnectionRequest,
   getConnectionRequests,
+  getSentRequests,
   getConnections,
 } from "../services/api";
 import toast from "react-hot-toast";
@@ -39,6 +40,7 @@ export default function ConnectPage() {
   const [skillFilter, setSkillFilter] = useState("");
 
   const [pendingFromMe, setPendingFromMe]       = useState(new Set());
+  const [pendingToMe, setPendingToMe]           = useState(new Set()); // people who sent ME a request
   const [connected, setConnected]               = useState(new Set());
   const [pendingCount, setPendingCount]         = useState(0);
   const [sentThisSession, setSentThisSession]   = useState(new Set());
@@ -48,10 +50,11 @@ export default function ConnectPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [usersRes, incomingRes, connRes] = await Promise.all([
+        const [usersRes, incomingRes, connRes, sentRes] = await Promise.all([
           getAllUsers(),
           getConnectionRequests(user.id),
           getConnections(user.id),
+          getSentRequests(user.id),        // FIX: server-side sent requests
         ]);
 
         const others = (usersRes.data || []).filter(
@@ -62,27 +65,34 @@ export default function ConnectPage() {
 
         setPendingCount((incomingRes.data || []).length);
 
+        // People who sent ME a request
+        const incomingIds = new Set(
+          (incomingRes.data || []).map((r) => String(r.senderId))
+        );
+        setPendingToMe(incomingIds);
+
         const connIds = new Set(
           (connRes.data || []).map((c) => String(c.userId))
         );
         setConnected(connIds);
 
+        // FIX: build pendingFromMe from SERVER response, not just localStorage.
+        // This prevents the stale-localStorage → 400 "Request already sent" loop.
+        const serverSentIds = new Set(
+          (sentRes.data || []).map((r) => String(r.receiverId))
+        );
+        // Merge with localStorage in case of race (just sent this session)
         const stored = localStorage.getItem(`sentRequests_${user.id}`);
         const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+        const merged = new Set([...serverSentIds, ...storedSet]);
+        // Remove IDs that are now connected or incoming
+        for (const id of connIds) merged.delete(id);
+        for (const id of incomingIds) merged.delete(id);
 
-        // Remove IDs now connected
-        for (const id of connIds) storedSet.delete(id);
-
-        // Remove IDs of people who sent US a request
-        const incomingIds = new Set(
-          (incomingRes.data || []).map((r) => String(r.senderId))
-        );
-        for (const id of incomingIds) storedSet.delete(id);
-
-        setPendingFromMe(storedSet);
+        setPendingFromMe(merged);
         localStorage.setItem(
           `sentRequests_${user.id}`,
-          JSON.stringify([...storedSet])
+          JSON.stringify([...merged])
         );
       } catch (err) {
         console.error(err);
@@ -94,15 +104,14 @@ export default function ConnectPage() {
   }, [user.id]); // eslint-disable-line
 
   // ── Refetch connection state on every navigation to this page ────────────
-  // useLocation detects same-tab navigation (e.g. back from NotificationsPage)
-  // so accepted connections update immediately without needing a tab switch.
   useEffect(() => {
     if (location.pathname !== "/connect") return;
     const refreshState = async () => {
       try {
-        const [incomingRes, connRes] = await Promise.all([
+        const [incomingRes, connRes, sentRes] = await Promise.all([
           getConnectionRequests(user.id),
           getConnections(user.id),
+          getSentRequests(user.id),
         ]);
         const connIds = new Set(
           (connRes.data || []).map((c) => String(c.userId))
@@ -110,19 +119,24 @@ export default function ConnectPage() {
         setConnected(connIds);
         setPendingCount((incomingRes.data || []).length);
 
-        const stored = localStorage.getItem(`sentRequests_${user.id}`);
-        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
-        for (const id of connIds) storedSet.delete(id);
-
         const incomingIds = new Set(
           (incomingRes.data || []).map((r) => String(r.senderId))
         );
-        for (const id of incomingIds) storedSet.delete(id);
+        setPendingToMe(incomingIds);
 
-        setPendingFromMe(storedSet);
+        const serverSentIds = new Set(
+          (sentRes.data || []).map((r) => String(r.receiverId))
+        );
+        const stored = localStorage.getItem(`sentRequests_${user.id}`);
+        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+        const merged = new Set([...serverSentIds, ...storedSet]);
+        for (const id of connIds) merged.delete(id);
+        for (const id of incomingIds) merged.delete(id);
+
+        setPendingFromMe(merged);
         localStorage.setItem(
           `sentRequests_${user.id}`,
-          JSON.stringify([...storedSet])
+          JSON.stringify([...merged])
         );
       } catch (e) {
         console.error(e);
@@ -194,6 +208,7 @@ export default function ConnectPage() {
   const getButtonState = (userId) => {
     const id = String(userId);
     if (connected.has(id)) return "connected";
+    if (pendingToMe.has(id)) return "incoming";   // FIX: they sent YOU a request
     if (pendingFromMe.has(id) || sentThisSession.has(id)) return "sent";
     return "none";
   };
@@ -350,8 +365,11 @@ export default function ConnectPage() {
                   </div>
 
                   <button
-                    onClick={() => btnState === "none" && handleConnect(u.id)}
-                    disabled={btnState !== "none"}
+                    onClick={() => {
+                      if (btnState === "none") handleConnect(u.id);
+                      else if (btnState === "incoming") navigate("/notifications");
+                    }}
+                    disabled={btnState === "connected" || btnState === "sent"}
                     style={{
                       marginTop: "auto",
                       padding: "9px 0",
@@ -360,24 +378,36 @@ export default function ConnectPage() {
                         ? "1px solid var(--success-border)"
                         : btnState === "sent"
                         ? "1px solid var(--border)"
+                        : btnState === "incoming"
+                        ? "1px solid #7C3AED"
                         : "none",
                       background: btnState === "connected"
                         ? "var(--success-bg)"
                         : btnState === "sent"
                         ? "var(--bg-subtle)"
+                        : btnState === "incoming"
+                        ? "rgba(124,58,237,0.1)"
                         : "var(--primary)",
                       color: btnState === "connected"
                         ? "var(--success)"
                         : btnState === "sent"
                         ? "var(--text-muted)"
+                        : btnState === "incoming"
+                        ? "#7C3AED"
                         : "#fff",
                       fontSize: 13,
                       fontWeight: 600,
-                      cursor: btnState === "none" ? "pointer" : "default",
+                      cursor: (btnState === "none" || btnState === "incoming") ? "pointer" : "default",
                       transition: "all 0.2s",
                     }}
                   >
-                    {btnState === "connected" ? "✓ Connected" : btnState === "sent" ? "⏳ Requested" : "Connect"}
+                    {btnState === "connected"
+                      ? "✓ Connected"
+                      : btnState === "sent"
+                      ? "⏳ Requested"
+                      : btnState === "incoming"
+                      ? "🔔 Respond"
+                      : "Connect"}
                   </button>
                 </div>
               );
