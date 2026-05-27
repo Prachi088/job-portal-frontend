@@ -4,33 +4,14 @@ import { useAuth } from "../context/AuthContext";
 import { getConnectionRequests } from "../services/api";
 import toast from "react-hot-toast";
 
-// ── Small helper: fetch accepted requests the current user SENT ────────────
-async function fetchAcceptedRequests(userId) {
-  try {
-    const API_URL = import.meta.env.VITE_API_URL;
-    const token   = localStorage.getItem("token");
-    const res     = await fetch(
-      `${API_URL}/api/connections/requests/accepted/${userId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
-
 export default function Navbar() {
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
-  const [mobileOpen, setMobileOpen]       = useState(false);
-  const [pendingCount, setPendingCount]   = useState(0);   // incoming requests badge
-  const [acceptedCount, setAcceptedCount] = useState(0);   // accepted-by-others badge
-  const drawerRef  = useRef(null);
-  const userId     = user?.id;
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const drawerRef = useRef(null);
+  const userId = user?.id;
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -41,9 +22,12 @@ export default function Navbar() {
 
   const isActive = (path) => location.pathname === path;
 
-  // ── Poll incoming connection requests (receiver side) ────────────────────
   const fetchPending = useCallback(async () => {
-    if (!userId) { setPendingCount(0); return; }
+    if (!userId) {
+      setPendingCount(0);
+      return;
+    }
+
     try {
       const res = await getConnectionRequests(userId);
       setPendingCount((res.data || []).length);
@@ -52,86 +36,24 @@ export default function Navbar() {
     }
   }, [userId]);
 
-  // ── Poll accepted requests (sender side) ─────────────────────────────────
-  // We store IDs we've already toasted about in localStorage so the user
-  // only gets one toast per acceptance, not one every 10 seconds.
-  const fetchAccepted = useCallback(async () => {
-    if (!userId) { setAcceptedCount(0); return; }
-
-    const accepted = await fetchAcceptedRequests(userId);
-    if (!accepted.length) { setAcceptedCount(0); return; }
-
-    // Load the set of request IDs we've already notified about
-    const seenKey  = `seenAccepted_${userId}`;
-    const seenRaw  = localStorage.getItem(seenKey);
-    const seen     = seenRaw ? new Set(JSON.parse(seenRaw)) : new Set();
-
-    const newOnes  = accepted.filter((r) => !seen.has(String(r.id)));
-
-    // Fire a toast for each newly-accepted request
-    newOnes.forEach((r) => {
-      toast.success(`🎉 ${r.receiverName} accepted your connection request!`, {
-        duration: 5000,
-        icon: "🤝",
-      });
-      seen.add(String(r.id));
-    });
-
-    // Persist seen IDs so we don't re-toast on next poll
-    localStorage.setItem(seenKey, JSON.stringify([...seen]));
-
-    // Badge = total accepted requests the user hasn't "visited" yet.
-    // We clear the badge when they navigate to /connected.
-    const visitedKey  = `visitedAccepted_${userId}`;
-    const visitedRaw  = localStorage.getItem(visitedKey);
-    const visited     = visitedRaw ? new Set(JSON.parse(visitedRaw)) : new Set();
-    const unvisited   = accepted.filter((r) => !visited.has(String(r.id)));
-    setAcceptedCount(unvisited.length);
-  }, [userId]);
-
-  // ── Clear accepted badge when user visits the Connections page ────────────
+  // Fetch pending connection requests count
   useEffect(() => {
-    if (location.pathname !== "/connected") return;
-    if (!userId) return;
-    // Mark all currently-accepted requests as "visited"
-    fetchAcceptedRequests(userId).then((accepted) => {
-      const visitedKey = `visitedAccepted_${userId}`;
-      const ids        = accepted.map((r) => String(r.id));
-      localStorage.setItem(visitedKey, JSON.stringify(ids));
-      setAcceptedCount(0);
-    });
-  }, [location.pathname, userId]);
-
-  // ── Polling setup ─────────────────────────────────────────────────────────
-  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPending();
-    fetchAccepted();
-    // Poll every 10 seconds for both
-    const interval = setInterval(() => {
-      fetchPending();
-      fetchAccepted();
-    }, 10000);
+    const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
-  }, [fetchPending, fetchAccepted]);
+  }, [fetchPending]);
 
-  // ── Re-fetch immediately when a connection is accepted/rejected ───────────
   useEffect(() => {
-    const handler = () => { fetchPending(); fetchAccepted(); };
-    window.addEventListener(CONNECTION_UPDATED_EVENT, handler);
-    window.addEventListener("connectionStatusChanged", handler); // legacy support
-    return () => {
-      window.removeEventListener(CONNECTION_UPDATED_EVENT, handler);
-      window.removeEventListener("connectionStatusChanged", handler);
-    };
-  }, [fetchPending, fetchAccepted]);
-
-  // ── Total badge on the bell = incoming pending + unvisited acceptances ────
-  const totalBadge = pendingCount + acceptedCount;
+    window.addEventListener("connectionStatusChanged", fetchPending);
+    return () => window.removeEventListener("connectionStatusChanged", fetchPending);
+  }, [fetchPending]);
 
   // Close drawer on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  // Close drawer on ESC
+  // Close drawer on ESC key
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setMobileOpen(false);
     document.addEventListener("keydown", onKey);
@@ -197,14 +119,12 @@ export default function Navbar() {
 
         {/* ── Desktop right ── */}
         <div className="nav-desktop-user" style={styles.userArea}>
-
-          {/* Connections icon — shows accepted badge */}
+          {/* Connections icon */}
           <button
             onClick={() => navigate("/connected")}
             title="My Connections"
             style={{
               ...styles.iconBtn,
-              position: "relative",
               background: isActive("/connected") ? "var(--primary-dim)" : "none",
               color: isActive("/connected") ? "var(--primary)" : "var(--text-muted)",
             }}
@@ -215,42 +135,20 @@ export default function Navbar() {
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
-            {acceptedCount > 0 && (
-              <span style={{
-                position: "absolute", top: 2, right: 2,
-                background: "#10B981", color: "#fff",
-                borderRadius: "50%", width: 16, height: 16,
-                fontSize: 10, fontWeight: 700,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {acceptedCount > 9 ? "9+" : acceptedCount}
-              </span>
-            )}
           </button>
 
-          {/* Notifications bell — shows incoming requests badge */}
+          {/* Notifications icon */}
           <button
             onClick={() => navigate("/notifications")}
             title="Connection Requests"
-            style={{
-              ...styles.iconBtn,
-              position: "relative",
-              color: isActive("/notifications") ? "var(--primary)" : "var(--text-muted)",
-              background: isActive("/notifications") ? "var(--primary-dim)" : "none",
-            }}
+            style={{ ...styles.iconBtn, position: "relative", color: isActive("/notifications") ? "var(--primary)" : "var(--text-muted)", background: isActive("/notifications") ? "var(--primary-dim)" : "none" }}
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
             {pendingCount > 0 && (
-              <span style={{
-                position: "absolute", top: 2, right: 2,
-                background: "#EF4444", color: "#fff",
-                borderRadius: "50%", width: 16, height: 16,
-                fontSize: 10, fontWeight: 700,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
+              <span style={{ position: "absolute", top: 2, right: 2, background: "#EF4444", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {pendingCount > 9 ? "9+" : pendingCount}
               </span>
             )}
@@ -264,25 +162,17 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* ── Mobile: bell + avatar + hamburger ── */}
+        {/* ── Mobile: avatar + hamburger ── */}
         <div className="nav-mobile-right" style={styles.mobileRight}>
+          {/* Mobile notification badge */}
           <button
             onClick={() => navigate("/notifications")}
             style={{ ...styles.iconBtn, position: "relative" }}
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-            {totalBadge > 0 && (
-              <span style={{
-                position: "absolute", top: 0, right: 0,
-                background: "#EF4444", color: "#fff",
-                borderRadius: "50%", width: 14, height: 14,
-                fontSize: 9, fontWeight: 700,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {totalBadge > 9 ? "9+" : totalBadge}
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {pendingCount > 0 && (
+              <span style={{ position: "absolute", top: 0, right: 0, background: "#EF4444", color: "#fff", borderRadius: "50%", width: 14, height: 14, fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {pendingCount > 9 ? "9+" : pendingCount}
               </span>
             )}
           </button>
@@ -317,6 +207,7 @@ export default function Navbar() {
         aria-modal="true"
         aria-label="Navigation menu"
       >
+        {/* Drawer header */}
         <div style={styles.drawerHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ ...styles.avatar, width: 40, height: 40, fontSize: 15 }}>
@@ -334,6 +225,7 @@ export default function Navbar() {
           </button>
         </div>
 
+        {/* Drawer nav links */}
         <div style={styles.drawerLinks}>
           {navLinks.map(({ to, label }) => (
             <Link
@@ -370,21 +262,12 @@ export default function Navbar() {
               borderLeft: isActive("/connected") ? "3px solid var(--primary)" : "3px solid transparent",
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             My Connections
-            {acceptedCount > 0 && (
-              <span style={{ marginLeft: "auto", background: "#10B981", color: "#fff", borderRadius: 20, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                {acceptedCount}
-              </span>
-            )}
           </Link>
         </div>
 
+        {/* Drawer footer */}
         <div style={styles.drawerFooter}>
           <button onClick={handleLogout} style={styles.drawerLogout}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -457,7 +340,21 @@ function NavLink({ to, active, label, badge = 0 }) {
 }
 
 const styles = {
-  nav: { background: "rgba(250,250,248,0.94)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)", padding: "0 clamp(14px, 4vw, 28px)", minHeight: "62px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 999, gap: 12 },
+  nav: {
+    background: "rgba(250,250,248,0.94)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    borderBottom: "1px solid var(--border)",
+    padding: "0 clamp(14px, 4vw, 28px)",
+    minHeight: "62px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    position: "sticky",
+    top: 0,
+    zIndex: 999,
+    gap: 12,
+  },
   logo: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexShrink: 0, textDecoration: "none" },
   logoMark: { width: "clamp(28px, 5vw, 34px)", height: "clamp(28px, 5vw, 34px)", background: "var(--primary)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 },
   logoText: { fontFamily: "var(--font-display)", fontSize: "clamp(13px, 2.5vw, 17px)", fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.3px", whiteSpace: "nowrap" },
