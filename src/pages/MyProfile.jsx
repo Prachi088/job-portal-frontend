@@ -112,7 +112,7 @@ export default function MyProfile() {
   useEffect(() => {
     if (!userId) { setError('Unable to load profile — no user signed in.'); setLoading(false); return }
     setLoading(true); setError(''); refreshUserProfile()
-  }, [userId])
+  }, [userId, refreshUserProfile])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

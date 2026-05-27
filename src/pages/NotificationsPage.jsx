@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { getConnectionRequests, updateConnectionRequest } from "../services/api";
@@ -15,6 +15,10 @@ function getAvatarColor(name = "") {
   return AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 }
 
+// Custom event key used to signal ConnectPage / ConnectionsPage to refresh
+// their state after a request is accepted or rejected here.
+const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
+
 export default function NotificationsPage() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
@@ -22,57 +26,85 @@ export default function NotificationsPage() {
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(new Set());
   const pollRef                     = useRef(null);
+  // Track whether the initial load has completed so background polls
+  // never flip loading back to true (which caused the skeleton to flicker
+  // on every 5-second tick).
+  const initialLoadDone             = useRef(false);
 
   // ── Fetch pending requests ─────────────────────────────────────────────────
-  const fetchRequests = async (isRetry = false) => {
+  const fetchRequests = useCallback(async (isRetry = false) => {
     try {
       const res = await getConnectionRequests(user.id);
       setRequests(res.data || []);
     } catch (err) {
       if (err.response?.status === 429 && !isRetry) {
-        // Rate limited — wait 2 s then retry once
+        // Rate limited — wait 2 s then retry once without touching loading state.
         setTimeout(() => fetchRequests(true), 2000);
         return;
       }
       console.error(err);
-      // Only show a toast on the initial hard load, not background polls
-      if (!isRetry) toast.error("Failed to load notifications");
+      if (!initialLoadDone.current) toast.error("Failed to load notifications");
     } finally {
-      setLoading(false);
+      // Only set loading false once — on the very first call.
+      if (!initialLoadDone.current) {
+        initialLoadDone.current = true;
+        setLoading(false);
+      }
     }
-  };
+  }, [user.id]);
 
   useEffect(() => {
-    // Initial load
     setLoading(true);
+    initialLoadDone.current = false;
     fetchRequests();
 
-    // FIX: the old code only fetched once on mount. If someone sent a request
-    // while the user was already on this page the notification would never
-    // appear until they navigated away and back. Polling every 5 s keeps the
-    // list in sync without needing WebSockets.
+    // Poll every 5 s so new incoming requests appear without a page reload.
     pollRef.current = setInterval(() => fetchRequests(), 5000);
     return () => clearInterval(pollRef.current);
-  }, [user.id]); // eslint-disable-line
+  }, [fetchRequests]);
 
   // ── Accept / Reject ────────────────────────────────────────────────────────
-  const handleUpdate = async (id, status) => {
+  const handleUpdate = async (req, status) => {
+    const { id, senderId } = req;
     setProcessing(prev => new Set([...prev, id]));
     try {
       await updateConnectionRequest(id, status);
-      // Remove from list immediately (optimistic)
+
+      // Optimistically remove from list immediately.
       setRequests(prev => prev.filter(r => r.id !== id));
+
       if (status === "ACCEPTED") {
-        // Clear the sender's cached "pending from me" so ConnectPage shows
-        // them as "Connected" on the next visit rather than "Requested".
+        // 1. Clear the SENDER's cached "pending from me" so ConnectPage shows
+        //    them as "Connected" the next time they visit.
+        //    We can't key into their localStorage directly, but we CAN clear our
+        //    own cached state and fire a cross-page event so ConnectPage re-syncs.
         localStorage.removeItem(`sentRequests_${user.id}`);
+
+        // 2. Fire a custom DOM event so ConnectPage and ConnectionsPage
+        //    immediately re-fetch without waiting for their next poll/nav.
+        //    The event carries the senderId so pages can do targeted refreshes.
+        window.dispatchEvent(
+          new CustomEvent(CONNECTION_UPDATED_EVENT, {
+            detail: { type: "ACCEPTED", senderId, receiverId: user.id },
+          })
+        );
+
         toast.success("Connection accepted!");
       } else {
+        // For rejections, still notify ConnectPage so the sender's button
+        // reverts from "⏳ Requested" to "Connect".
+        window.dispatchEvent(
+          new CustomEvent(CONNECTION_UPDATED_EVENT, {
+            detail: { type: "REJECTED", senderId, receiverId: user.id },
+          })
+        );
         toast.success("Request rejected");
       }
     } catch (err) {
       console.error(err);
       toast.error("Failed to update request");
+      // Re-fetch on failure so the list is consistent with server state.
+      fetchRequests();
     }
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
   };
@@ -154,18 +186,18 @@ export default function NotificationsPage() {
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
-                      onClick={() => handleUpdate(req.id, "ACCEPTED")}
+                      onClick={() => handleUpdate(req, "ACCEPTED")}
                       disabled={isProcessing}
-                      style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: isProcessing ? 0.6 : 1 }}
+                      style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >
-                      Accept
+                      {isProcessing ? "..." : "Accept"}
                     </button>
                     <button
-                      onClick={() => handleUpdate(req.id, "REJECTED")}
+                      onClick={() => handleUpdate(req, "REJECTED")}
                       disabled={isProcessing}
-                      style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: isProcessing ? 0.6 : 1 }}
+                      style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >
-                      Reject
+                      {isProcessing ? "..." : "Reject"}
                     </button>
                   </div>
                 </div>

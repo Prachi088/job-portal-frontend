@@ -127,11 +127,13 @@ export default function JobListings() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (activeTab === 'jobs') fetchJobs()
     else fetchEvents()
   }, [activeTab, fetchJobs, fetchEvents])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSavedJobs(JSON.parse(localStorage.getItem('savedJobs') || '[]'))
     setSavedEvents(JSON.parse(localStorage.getItem('savedEvents') || '[]'))
   }, [])

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { getConversation, sendMsg, markMessagesRead } from "../services/api";
@@ -48,7 +48,7 @@ export default function ChatPage() {
   const inputRef                  = useRef(null);
   const pollRef                   = useRef(null);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       const res = await getConversation(user.id, otherId);
       setMessages(res.data || []);
@@ -57,7 +57,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [user.id, otherId]);
 
   useEffect(() => {
     const init = async () => {
@@ -70,7 +70,7 @@ export default function ChatPage() {
     // Poll every 3 seconds for new messages
     pollRef.current = setInterval(fetchMessages, 3000);
     return () => clearInterval(pollRef.current);
-  }, [user.id, otherId]);
+  }, [fetchMessages]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -99,6 +99,7 @@ export default function ChatPage() {
       await sendMsg({ senderId: Number(user.id), receiverId: Number(otherId), content });
       await fetchMessages();
     } catch (err) {
+      console.error(err);
       toast.error("Failed to send message");
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       setInput(content);

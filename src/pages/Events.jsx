@@ -61,6 +61,7 @@ export default function Events() {
   }, [recruiterId, idMissing])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents()
   }, [fetchEvents])
 

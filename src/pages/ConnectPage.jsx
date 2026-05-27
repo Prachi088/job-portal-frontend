@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -27,6 +27,9 @@ function getAvatarColor(name = "") {
   return AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 }
 
+// Must match the constant in NotificationsPage.jsx
+const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
+
 export default function ConnectPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -39,111 +42,120 @@ export default function ConnectPage() {
   const [roleFilter, setRoleFilter]   = useState("ALL");
   const [skillFilter, setSkillFilter] = useState("");
 
-  const [pendingFromMe, setPendingFromMe]       = useState(new Set());
-  const [pendingToMe, setPendingToMe]           = useState(new Set()); // people who sent ME a request
-  const [connected, setConnected]               = useState(new Set());
-  const [pendingCount, setPendingCount]         = useState(0);
-  const [sentThisSession, setSentThisSession]   = useState(new Set());
+  const [pendingFromMe, setPendingFromMe]     = useState(new Set());
+  const [pendingToMe, setPendingToMe]         = useState(new Set()); // people who sent ME a request
+  const [connected, setConnected]             = useState(new Set());
+  const [pendingCount, setPendingCount]       = useState(0);
+  const [sentThisSession, setSentThisSession] = useState(new Set());
 
-  // ── Initial full fetch ────────────────────────────────────────────────────
+  // ── Shared state-refresh helper ───────────────────────────────────────────
+  // Fetches incoming requests, sent requests, and connections; updates all
+  // derived state sets. Does NOT touch the users list (already loaded).
+  const refreshConnectionState = useCallback(async () => {
+    try {
+      const [incomingRes, connRes] = await Promise.all([
+        getConnectionRequests(user.id),
+        getConnections(user.id),
+      ]);
+
+      let sentData = [];
+      try {
+        const sentRes = await getSentRequests(user.id);
+        sentData = sentRes.data || [];
+      } catch (_) {
+        // Backend endpoint not available / auth issue — fall back to localStorage.
+      }
+
+      const connIds = new Set(
+        (connRes.data || []).map((c) => String(c.userId))
+      );
+      setConnected(connIds);
+
+      setPendingCount((incomingRes.data || []).length);
+
+      const incomingIds = new Set(
+        (incomingRes.data || []).map((r) => String(r.senderId))
+      );
+      setPendingToMe(incomingIds);
+
+      // Build pendingFromMe from SERVER response as the source of truth.
+      // This prevents stale localStorage causing "Request already sent" 400s.
+      const serverSentIds = new Set(
+        sentData.map((r) => String(r.receiverId))
+      );
+      // Merge with localStorage in case of same-session race (just sent this tick)
+      const stored = localStorage.getItem(`sentRequests_${user.id}`);
+      const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+      const merged = new Set([...serverSentIds, ...storedSet]);
+      // Remove IDs that are now fully connected or incoming (they're not "pending from me")
+      for (const id of connIds) merged.delete(id);
+      for (const id of incomingIds) merged.delete(id);
+
+      setPendingFromMe(merged);
+      localStorage.setItem(
+        `sentRequests_${user.id}`,
+        JSON.stringify([...merged])
+      );
+    } catch (e) {
+      console.error("refreshConnectionState error:", e);
+    }
+  }, [user.id]);
+
+  // ── Initial full fetch (users + connection state) ─────────────────────────
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       setLoading(true);
       try {
-        const [usersRes, incomingRes, connRes, sentRes] = await Promise.all([
-          getAllUsers(),
-          getConnectionRequests(user.id),
-          getConnections(user.id),
-          getSentRequests(user.id),        // FIX: server-side sent requests
-        ]);
-
+        const usersRes = await getAllUsers();
         const others = (usersRes.data || []).filter(
           (u) => String(u.id) !== String(user.id)
         );
         setUsers(others);
         setFiltered(others);
-
-        setPendingCount((incomingRes.data || []).length);
-
-        // People who sent ME a request
-        const incomingIds = new Set(
-          (incomingRes.data || []).map((r) => String(r.senderId))
-        );
-        setPendingToMe(incomingIds);
-
-        const connIds = new Set(
-          (connRes.data || []).map((c) => String(c.userId))
-        );
-        setConnected(connIds);
-
-        // FIX: build pendingFromMe from SERVER response, not just localStorage.
-        // This prevents the stale-localStorage → 400 "Request already sent" loop.
-        const serverSentIds = new Set(
-          (sentRes.data || []).map((r) => String(r.receiverId))
-        );
-        // Merge with localStorage in case of race (just sent this session)
-        const stored = localStorage.getItem(`sentRequests_${user.id}`);
-        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
-        const merged = new Set([...serverSentIds, ...storedSet]);
-        // Remove IDs that are now connected or incoming
-        for (const id of connIds) merged.delete(id);
-        for (const id of incomingIds) merged.delete(id);
-
-        setPendingFromMe(merged);
-        localStorage.setItem(
-          `sentRequests_${user.id}`,
-          JSON.stringify([...merged])
-        );
       } catch (err) {
         console.error(err);
         toast.error("Failed to load users");
       }
+      // Fetch connection state separately so a users failure doesn't block it
+      await refreshConnectionState();
       setLoading(false);
     };
-    fetchData();
-  }, [user.id]); // eslint-disable-line
+    fetchAll();
+  }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Refetch connection state on every navigation to this page ────────────
+  // ── Re-fetch connection state on every navigation back to this page ────────
   useEffect(() => {
     if (location.pathname !== "/connect") return;
-    const refreshState = async () => {
-      try {
-        const [incomingRes, connRes, sentRes] = await Promise.all([
-          getConnectionRequests(user.id),
-          getConnections(user.id),
-          getSentRequests(user.id),
-        ]);
-        const connIds = new Set(
-          (connRes.data || []).map((c) => String(c.userId))
-        );
-        setConnected(connIds);
-        setPendingCount((incomingRes.data || []).length);
+    refreshConnectionState();
+  }, [location.pathname, refreshConnectionState]);
 
-        const incomingIds = new Set(
-          (incomingRes.data || []).map((r) => String(r.senderId))
-        );
-        setPendingToMe(incomingIds);
+  // ── Listen for accept/reject events fired by NotificationsPage ────────────
+  // This makes ConnectPage update in real-time even while staying mounted
+  // (e.g. if a user opens Notifications in a different tab or via back-nav).
+  useEffect(() => {
+    const handleConnectionUpdate = (e) => {
+      const { type, senderId } = e.detail || {};
 
-        const serverSentIds = new Set(
-          (sentRes.data || []).map((r) => String(r.receiverId))
-        );
-        const stored = localStorage.getItem(`sentRequests_${user.id}`);
-        const storedSet = stored ? new Set(JSON.parse(stored)) : new Set();
-        const merged = new Set([...serverSentIds, ...storedSet]);
-        for (const id of connIds) merged.delete(id);
-        for (const id of incomingIds) merged.delete(id);
-
-        setPendingFromMe(merged);
-        localStorage.setItem(
-          `sentRequests_${user.id}`,
-          JSON.stringify([...merged])
-        );
-      } catch (e) {
-        console.error(e);
+      if (type === "ACCEPTED") {
+        // The person who sent us a request is now a connection.
+        const id = String(senderId);
+        setConnected(prev => new Set([...prev, id]));
+        setPendingToMe(prev => { const s = new Set(prev); s.delete(id); return s; });
+        setPendingFromMe(prev => { const s = new Set(prev); s.delete(id); return s; });
+        setPendingCount(prev => Math.max(0, prev - 1));
+        // Also do a full server sync to be safe (runs in the background)
+        refreshConnectionState();
+      } else if (type === "REJECTED") {
+        const id = String(senderId);
+        setPendingToMe(prev => { const s = new Set(prev); s.delete(id); return s; });
+        setPendingCount(prev => Math.max(0, prev - 1));
+        refreshConnectionState();
       }
     };
-    refreshState();
-  }, [location.pathname, user.id]); // eslint-disable-line
+
+    window.addEventListener(CONNECTION_UPDATED_EVENT, handleConnectionUpdate);
+    return () => window.removeEventListener(CONNECTION_UPDATED_EVENT, handleConnectionUpdate);
+  }, [refreshConnectionState]);
 
   // ── Filter ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -173,6 +185,7 @@ export default function ConnectPage() {
     const id = String(receiverId);
     if (sentThisSession.has(id) || pendingFromMe.has(id) || connected.has(id)) return;
 
+    // Optimistic update so the button changes immediately
     setSentThisSession((prev) => new Set([...prev, id]));
 
     try {
@@ -187,6 +200,7 @@ export default function ConnectPage() {
     } catch (err) {
       const msg = err.response?.data;
       if (typeof msg === "string" && msg.toLowerCase().includes("already")) {
+        // Server says already sent — treat as sent (don't revert button)
         const newSet = new Set([...pendingFromMe, id]);
         setPendingFromMe(newSet);
         localStorage.setItem(
@@ -195,6 +209,7 @@ export default function ConnectPage() {
         );
         toast("Request already sent");
       } else {
+        // Real failure — revert optimistic update
         setSentThisSession((prev) => {
           const s = new Set(prev);
           s.delete(id);
@@ -208,7 +223,7 @@ export default function ConnectPage() {
   const getButtonState = (userId) => {
     const id = String(userId);
     if (connected.has(id)) return "connected";
-    if (pendingToMe.has(id)) return "incoming";   // FIX: they sent YOU a request
+    if (pendingToMe.has(id)) return "incoming";   // they sent YOU a request
     if (pendingFromMe.has(id) || sentThisSession.has(id)) return "sent";
     return "none";
   };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getConnectionRequests } from "../services/api";
@@ -11,6 +11,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const drawerRef = useRef(null);
+  const userId = user?.id;
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -21,21 +22,35 @@ export default function Navbar() {
 
   const isActive = (path) => location.pathname === path;
 
+  const fetchPending = useCallback(async () => {
+    if (!userId) {
+      setPendingCount(0);
+      return;
+    }
+
+    try {
+      const res = await getConnectionRequests(userId);
+      setPendingCount((res.data || []).length);
+    } catch (err) {
+      console.warn("Failed to load pending connection count", err);
+    }
+  }, [userId]);
+
   // Fetch pending connection requests count
   useEffect(() => {
-    if (!user?.id) return;
-    const fetchPending = async () => {
-      try {
-        const res = await getConnectionRequests(user.id);
-        setPendingCount((res.data || []).length);
-      } catch {}
-    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
-  }, [user?.id]);
+  }, [fetchPending]);
+
+  useEffect(() => {
+    window.addEventListener("connectionStatusChanged", fetchPending);
+    return () => window.removeEventListener("connectionStatusChanged", fetchPending);
+  }, [fetchPending]);
 
   // Close drawer on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   // Close drawer on ESC key

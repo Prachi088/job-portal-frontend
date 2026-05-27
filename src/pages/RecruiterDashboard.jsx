@@ -82,7 +82,10 @@ export default function RecruiterDashboard() {
     setLoading(false)
   }, [recruiterId, idMissing])
 
-  useEffect(() => { fetchJobs() }, [fetchJobs])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchJobs()
+  }, [fetchJobs])
 
   // ── Post Job ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {

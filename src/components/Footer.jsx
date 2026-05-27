@@ -46,7 +46,6 @@ export default function Footer() {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const isLoggedIn = !!localStorage.getItem("token");
   const hidden = ["/about", "/login", "/register"].includes(location.pathname);
   if (hidden) return null;
 

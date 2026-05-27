@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useAuth } from "../context/AuthContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -147,13 +148,20 @@ function HeroMockup() {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function About() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   // FIX: initialise as null so we can distinguish "not loaded yet" from "0"
   const [stats, setStats] = useState({ users: null, jobs: null, events: null });
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredStep, setHoveredStep] = useState(null);
-  const isLoggedIn = !!localStorage.getItem("id");
+  const isLoggedIn = !!user || !!localStorage.getItem("id");
   const yearsOfSATI = new Date().getFullYear() - SATI_FOUNDED;
+
+  const handleSignOut = () => {
+    logout();
+    setMenuOpen(false);
+    navigate("/about");
+  };
 
   // refs
   const pageRef        = useRef(null);
@@ -366,7 +374,7 @@ export default function About() {
             {isLoggedIn ? (
               <>
                 <button onClick={() => navigate("/dashboard")} style={s.navLink}>Dashboard</button>
-                <button onClick={() => { localStorage.clear(); navigate("/about"); }} style={s.navDanger}>Sign Out</button>
+                <button onClick={handleSignOut} style={s.navDanger}>Sign Out</button>
               </>
             ) : (
               <>
@@ -388,7 +396,7 @@ export default function About() {
             {isLoggedIn ? (
               <>
                 <button onClick={() => { navigate("/dashboard"); setMenuOpen(false); }} style={s.drawerPrimary}>Dashboard</button>
-                <button onClick={() => { localStorage.clear(); setMenuOpen(false); }} style={s.drawerDanger}>Sign Out</button>
+                <button onClick={handleSignOut} style={s.drawerDanger}>Sign Out</button>
               </>
             ) : (
               <>
