@@ -25,6 +25,15 @@ API.interceptors.response.use(
       localStorage.removeItem('name');
       localStorage.removeItem('role');
       localStorage.removeItem('id');
+
+      // FIX: Before redirecting, persist the URL the user was on so Login can
+      // redirect back to it after a successful re-authentication. Without this,
+      // the user always lands on the default dashboard and loses their context.
+      const currentPath = window.location.pathname + window.location.search;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        localStorage.setItem('redirectAfterLogin', currentPath);
+      }
+
       window.location.href = '/login';
     }
     return Promise.reject(error);

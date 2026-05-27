@@ -15,8 +15,15 @@ function getAvatarColor(name = "") {
   return AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 }
 
-// Custom event key used to signal ConnectPage / ConnectionsPage to refresh
-// their state after a request is accepted or rejected here.
+// FIX: Key used to persist an in-flight Accept/Reject action across a
+// token-expiry redirect. When the user clicks Accept and their JWT has expired,
+// the api.js interceptor fires before the response comes back, clears
+// credentials, saves the current path as redirectAfterLogin, and pushes to
+// /login. On re-login, Login.jsx navigates back to /notifications, and this
+// component reads PENDING_ACTION_KEY on mount and replays the action
+// automatically — so the user never has to click Accept twice.
+const PENDING_ACTION_KEY = "pendingConnectionAction";
+
 const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
 
 export default function NotificationsPage() {
@@ -26,9 +33,6 @@ export default function NotificationsPage() {
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(new Set());
   const pollRef                     = useRef(null);
-  // Track whether the initial load has completed so background polls
-  // never flip loading back to true (which caused the skeleton to flicker
-  // on every 5-second tick).
   const initialLoadDone             = useRef(false);
 
   // ── Fetch pending requests ─────────────────────────────────────────────────
@@ -38,14 +42,12 @@ export default function NotificationsPage() {
       setRequests(res.data || []);
     } catch (err) {
       if (err.response?.status === 429 && !isRetry) {
-        // Rate limited — wait 2 s then retry once without touching loading state.
         setTimeout(() => fetchRequests(true), 2000);
         return;
       }
       console.error(err);
       if (!initialLoadDone.current) toast.error("Failed to load notifications");
     } finally {
-      // Only set loading false once — on the very first call.
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
         setLoading(false);
@@ -53,46 +55,28 @@ export default function NotificationsPage() {
     }
   }, [user.id]);
 
-  useEffect(() => {
-    setLoading(true);
-    initialLoadDone.current = false;
-    fetchRequests();
-
-    // Poll every 5 s so new incoming requests appear without a page reload.
-    pollRef.current = setInterval(() => fetchRequests(), 5000);
-    return () => clearInterval(pollRef.current);
-  }, [fetchRequests]);
-
-  // ── Accept / Reject ────────────────────────────────────────────────────────
-  const handleUpdate = async (req, status) => {
+  // ── Core accept/reject handler (also called by the replay-on-mount effect) ──
+  const handleUpdate = useCallback(async (req, status) => {
     const { id, senderId } = req;
     setProcessing(prev => new Set([...prev, id]));
     try {
       await updateConnectionRequest(id, status);
 
-      // Optimistically remove from list immediately.
+      // FIX: If we get here, the action succeeded. Clear any pending action
+      // that was saved before a previous token-expiry redirect — it's done.
+      localStorage.removeItem(PENDING_ACTION_KEY);
+
       setRequests(prev => prev.filter(r => r.id !== id));
 
       if (status === "ACCEPTED") {
-        // 1. Clear the SENDER's cached "pending from me" so ConnectPage shows
-        //    them as "Connected" the next time they visit.
-        //    We can't key into their localStorage directly, but we CAN clear our
-        //    own cached state and fire a cross-page event so ConnectPage re-syncs.
         localStorage.removeItem(`sentRequests_${user.id}`);
-
-        // 2. Fire a custom DOM event so ConnectPage and ConnectionsPage
-        //    immediately re-fetch without waiting for their next poll/nav.
-        //    The event carries the senderId so pages can do targeted refreshes.
         window.dispatchEvent(
           new CustomEvent(CONNECTION_UPDATED_EVENT, {
             detail: { type: "ACCEPTED", senderId, receiverId: user.id },
           })
         );
-
         toast.success("Connection accepted!");
       } else {
-        // For rejections, still notify ConnectPage so the sender's button
-        // reverts from "⏳ Requested" to "Connect".
         window.dispatchEvent(
           new CustomEvent(CONNECTION_UPDATED_EVENT, {
             detail: { type: "REJECTED", senderId, receiverId: user.id },
@@ -102,11 +86,90 @@ export default function NotificationsPage() {
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update request");
-      // Re-fetch on failure so the list is consistent with server state.
-      fetchRequests();
+      // If it's NOT a 401/403 (which would have already redirected via the
+      // interceptor), show an error and re-fetch. The interceptor handles the
+      // auth-failure path by saving PENDING_ACTION_KEY then going to /login.
+      if (err.response?.status !== 401 && err.response?.status !== 403) {
+        toast.error("Failed to update request");
+        localStorage.removeItem(PENDING_ACTION_KEY);
+        fetchRequests();
+      }
+      // 401/403: interceptor already saved redirectAfterLogin and PENDING_ACTION_KEY,
+      // and is about to redirect to /login — nothing else to do here.
     }
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
+  }, [user.id, fetchRequests]);
+
+  useEffect(() => {
+    setLoading(true);
+    initialLoadDone.current = false;
+
+    // FIX: Replay any action that was interrupted by a token-expiry redirect.
+    // Flow: user clicks Accept → token expired → interceptor saves
+    // pendingConnectionAction + redirectAfterLogin → user re-logs in →
+    // Login.jsx navigates to /notifications → this effect fires, loads
+    // requests, then replays the saved action automatically.
+    const replayAction = async () => {
+      const saved = localStorage.getItem(PENDING_ACTION_KEY);
+      if (!saved) return;
+
+      let pending;
+      try { pending = JSON.parse(saved); } catch { localStorage.removeItem(PENDING_ACTION_KEY); return; }
+
+      // Wait for the fresh request list to arrive before replaying.
+      try {
+        const res = await getConnectionRequests(user.id);
+        const freshRequests = res.data || [];
+        setRequests(freshRequests);
+        initialLoadDone.current = true;
+        setLoading(false);
+
+        // Only replay if the request is still pending (wasn't already processed
+        // server-side before the redirect completed).
+        const stillPending = freshRequests.find(r => r.id === pending.requestId);
+        if (stillPending) {
+          toast(`Replaying your "${pending.status.toLowerCase()}" action...`, { icon: "🔄" });
+          await handleUpdate(stillPending, pending.status);
+        } else {
+          // The action may have gone through before the redirect, or the request
+          // was already handled another way — either way it's gone from pending.
+          localStorage.removeItem(PENDING_ACTION_KEY);
+          toast.success(
+            pending.status === "ACCEPTED"
+              ? "Connection was already accepted!"
+              : "Request was already handled."
+          );
+        }
+      } catch (err) {
+        console.error("Replay failed:", err);
+        localStorage.removeItem(PENDING_ACTION_KEY);
+      }
+    };
+
+    replayAction().then(() => {
+      // If replayAction handled the load, fetchRequests is still needed to
+      // start the polling interval — but we don't want it to flip loading
+      // back to true. initialLoadDone.current guards that.
+      fetchRequests();
+      pollRef.current = setInterval(() => fetchRequests(), 5000);
+    });
+
+    return () => clearInterval(pollRef.current);
+  }, [fetchRequests, handleUpdate, user.id]);
+
+  // ── Button click handler — saves intent before the API call in case the
+  //    token is expired and the interceptor fires before a response arrives ───
+  const handleUpdateWithSave = (req, status) => {
+    // FIX: Persist the intent to localStorage BEFORE the API call.
+    // If the token is expired, the axios interceptor fires synchronously
+    // during the request and redirects to /login before our .catch() runs —
+    // so we can't save state in the catch block. Writing it here guarantees
+    // it's persisted regardless of whether the call succeeds or fails.
+    localStorage.setItem(
+      PENDING_ACTION_KEY,
+      JSON.stringify({ requestId: req.id, senderId: req.senderId, status })
+    );
+    handleUpdate(req, status);
   };
 
   return (
@@ -186,14 +249,14 @@ export default function NotificationsPage() {
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
-                      onClick={() => handleUpdate(req, "ACCEPTED")}
+                      onClick={() => handleUpdateWithSave(req, "ACCEPTED")}
                       disabled={isProcessing}
                       style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >
                       {isProcessing ? "..." : "Accept"}
                     </button>
                     <button
-                      onClick={() => handleUpdate(req, "REJECTED")}
+                      onClick={() => handleUpdateWithSave(req, "REJECTED")}
                       disabled={isProcessing}
                       style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >

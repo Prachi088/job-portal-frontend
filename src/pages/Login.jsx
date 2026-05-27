@@ -27,7 +27,17 @@ export default function Login() {
         id: res.data.id,
       })
 
-      if (String(res.data.role).toUpperCase().replace(/^ROLE_/, '') === 'RECRUITER') {
+      // FIX: If the user was redirected here mid-session (e.g. token expired
+      // while clicking "Accept" on a notification), restore them to where they
+      // were instead of always landing on the default dashboard.
+      // redirectAfterLogin is written by the api.js response interceptor just
+      // before it clears credentials and pushes to /login.
+      const redirectTo = localStorage.getItem('redirectAfterLogin')
+      localStorage.removeItem('redirectAfterLogin')
+
+      if (redirectTo) {
+        navigate(redirectTo)
+      } else if (String(res.data.role).toUpperCase().replace(/^ROLE_/, '') === 'RECRUITER') {
         navigate('/recruiter')
       } else {
         navigate('/jobs')
