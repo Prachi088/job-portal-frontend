@@ -24,6 +24,7 @@ export default function NotificationsPage() {
   const [requests, setRequests]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(new Set());
+  const [backendWaking, setBackendWaking] = useState(false);
   const pollRef                     = useRef(null);
   const initialLoadDone             = useRef(false);
 
@@ -33,10 +34,15 @@ export default function NotificationsPage() {
     try {
       const res = await getConnectionRequests(user.id);
       setRequests(res.data || []);
+      setBackendWaking(false);
     } catch (err) {
       if (err.response?.status === 429 && !isRetry) {
         setTimeout(() => fetchRequests(true), 2000);
         return;
+      }
+      // Network error with no response = backend is sleeping (Render free tier)
+      if (!err.response) {
+        setBackendWaking(true);
       }
       console.error("fetchRequests error:", err);
       if (!initialLoadDone.current) toast.error("Failed to load notifications");
@@ -64,22 +70,26 @@ export default function NotificationsPage() {
     const { id, senderId } = req;
 
     setProcessing(prev => new Set([...prev, id]));
+
+    // Show "please wait" toast immediately in case backend is cold-starting
+    const waitToast = toast.loading(
+      status === "ACCEPTED" ? "Accepting…" : "Rejecting…"
+    );
+
     try {
       await updateConnectionRequest(id, status);
 
-      // Remove from list immediately — user stays on this page
+      toast.dismiss(waitToast);
       setRequests(prev => prev.filter(r => r.id !== id));
 
       if (status === "ACCEPTED") {
-        // Clear cached sent-requests so ConnectPage re-syncs
         localStorage.removeItem(`sentRequests_${user.id}`);
-
-        // Notify ConnectPage + ConnectionsPage to refresh in real time
         window.dispatchEvent(new CustomEvent(CONNECTION_UPDATED_EVENT, {
           detail: { type: "ACCEPTED", senderId, receiverId: user.id },
         }));
-
-        toast.success("Connection accepted! You can now message them.");
+        toast.success("Connection accepted! You can now message them.", {
+          duration: 4000,
+        });
       } else {
         window.dispatchEvent(new CustomEvent(CONNECTION_UPDATED_EVENT, {
           detail: { type: "REJECTED", senderId, receiverId: user.id },
@@ -87,18 +97,27 @@ export default function NotificationsPage() {
         toast.success("Request rejected");
       }
     } catch (err) {
+      toast.dismiss(waitToast);
       console.error("handleUpdate error:", err);
-      const status_code = err.response?.status;
-      if (status_code === 401 || status_code === 403) {
-        // Token expired — show friendly toast, stay on page, re-fetch
+
+      const statusCode = err.response?.status;
+
+      if (!err.response) {
+        // No response at all = backend cold start / network timeout
+        toast.error(
+          "Server is waking up (free tier). Please wait 30 seconds and try again.",
+          { duration: 6000 }
+        );
+      } else if (statusCode === 401 || statusCode === 403) {
+        // Token issue — show toast, stay on page (skipAuthRedirect is set)
         toast.error("Session expired. Please log in again.", { duration: 4000 });
-        // Give the user a moment to read the toast before redirecting
-        setTimeout(() => { window.location.href = "/login"; }, 2000);
+        setTimeout(() => { window.location.href = "/login"; }, 2500);
       } else {
-        toast.error("Failed to update request. Please try again.");
+        toast.error(`Failed to update request (${statusCode || "unknown error"}). Try again.`);
         fetchRequests();
       }
     }
+
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
   }, [user?.id, fetchRequests]);
 
@@ -126,8 +145,10 @@ export default function NotificationsPage() {
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
-              width: 36, height: 36, background: "rgba(255,255,255,0.15)",
-              borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+              width: 36, height: 36,
+              background: "rgba(255,255,255,0.15)",
+              borderRadius: 10,
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2">
@@ -152,6 +173,20 @@ export default function NotificationsPage() {
           </div>
         </div>
       </div>
+
+      {/* Backend waking up banner */}
+      {backendWaking && (
+        <div style={{
+          background: "#FEF3C7",
+          borderBottom: "1px solid #FCD34D",
+          padding: "10px 24px",
+          textAlign: "center",
+          fontSize: 13,
+          color: "#92400E",
+        }}>
+          ⏳ Server is starting up (free tier). Requests will load in ~30 seconds…
+        </div>
+      )}
 
       {/* Body */}
       <div style={{
@@ -228,14 +263,14 @@ export default function NotificationsPage() {
                     </div>
                   </div>
 
-                  {/* Action buttons */}
+                  {/* Buttons */}
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
                       onClick={() => handleUpdate(req, "ACCEPTED")}
                       disabled={isProcessing}
                       style={{
-                        padding: "8px 20px", borderRadius: 10, border: "none",
-                        background: "#4F46E5", color: "#fff",
+                        padding: "8px 20px", borderRadius: 10,
+                        border: "none", background: "#4F46E5", color: "#fff",
                         fontSize: 13, fontWeight: 600,
                         cursor: isProcessing ? "not-allowed" : "pointer",
                         opacity: isProcessing ? 0.6 : 1,
