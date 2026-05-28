@@ -17,23 +17,6 @@ function getAvatarColor(name = "") {
 
 const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
 
-// Pre-flight check: decode JWT expiry without a library.
-// We never trust this for auth decisions — the server validates the signature.
-// This is only used to show a friendly message before making a doomed request.
-function isTokenExpired() {
-  const token = localStorage.getItem("token");
-  if (!token) return true;
-  try {
-    const payload = JSON.parse(
-      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-    // payload.exp is in seconds; Date.now() is in milliseconds
-    return payload.exp * 1000 < Date.now();
-  } catch {
-    return true;
-  }
-}
-
 export default function NotificationsPage() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
@@ -85,17 +68,6 @@ export default function NotificationsPage() {
   const handleUpdate = useCallback(async (req, status) => {
     if (!user?.id) return;
 
-    // FIX: Pre-flight token expiry check.
-    // If the token is already expired, show a friendly message and stop here.
-    // This prevents a guaranteed 401 from the server and avoids the old
-    // behaviour of catching that 401 and forcibly redirecting to /login.
-    if (isTokenExpired()) {
-      toast.error(
-        "Your session has expired. Please refresh the page and log in again.",
-        { duration: 5000 }
-      );
-      return;
-    }
 
     const { id, senderId } = req;
 

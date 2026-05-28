@@ -19,8 +19,11 @@ export function isTokenExpired() {
     const payload = JSON.parse(
       atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
     );
-    // payload.exp is in seconds; Date.now() is milliseconds
-    return payload.exp * 1000 < Date.now();
+    // payload.exp is in seconds; Date.now() is milliseconds.
+    // 30-second buffer absorbs clock skew between browser and server so a
+    // token that is still valid server-side is never incorrectly blocked here.
+    const SKEW_MS = 30_000;
+    return payload.exp * 1000 < Date.now() - SKEW_MS;
   } catch {
     return true;
   }
