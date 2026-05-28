@@ -1,16 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Login.jsx — corrected version
-//
-// KEY FIX: After a successful login, check localStorage for a saved redirect
-// path (written by api.js when a 401 kicked the user out mid-session) and
-// navigate there instead of always going to the role-based dashboard default.
-//
-// This is what makes the pending-action replay in NotificationsPage work:
-//   user clicks Accept → token expired → interceptor saves /notifications as
-//   redirectAfterLogin → user re-logs in → this component sends them back to
-//   /notifications → NotificationsPage mounts and replays the Accept.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -33,34 +20,23 @@ export default function Login() {
       toast.error("Please fill in all fields");
       return;
     }
-
     setLoading(true);
     try {
       const res  = await loginUser(form);
       const data = res.data;
 
-      // Persist credentials via your AuthContext helper
       login(data);
-
       toast.success("Welcome back!");
 
-      // ── FIX: Honour the saved redirect path ────────────────────────────
-      // api.js writes redirectAfterLogin = window.location.pathname whenever
-      // a 401/403 forces the user to /login mid-session. We read it here,
-      // consume it (remove), and navigate there so the user lands exactly
-      // where they were — most importantly /notifications, which triggers the
-      // pending-action replay in NotificationsPage.
-      //
-      // If nothing was saved (normal login flow), fall back to the
-      // role-based dashboard.
+      // FIX: Honour the saved redirect path written by api.js on 401 expiry.
+      // Without this the user always lands on the dashboard and the pending
+      // Accept action in NotificationsPage is never replayed.
       const savedRedirect = localStorage.getItem("redirectAfterLogin");
-      localStorage.removeItem("redirectAfterLogin"); // consume — don't reuse
+      localStorage.removeItem("redirectAfterLogin");
 
-      const defaultPath =
-        data.role === "RECRUITER" ? "/recruiter" : "/jobs";
-
+      const defaultPath = data.role === "RECRUITER" ? "/recruiter" : "/jobs";
       navigate(savedRedirect || defaultPath, { replace: true });
-      // ────────────────────────────────────────────────────────────────────
+
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data || "Login failed";
       toast.error(typeof msg === "string" ? msg : "Invalid credentials");
@@ -70,19 +46,59 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)", padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 420, background: "var(--bg-surface)", borderRadius: 20, padding: "clamp(28px,6vw,48px)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}>
-
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: 6, textAlign: "center" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#F5F7FA",
+        padding: "24px 16px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: "#ffffff",
+          borderRadius: 20,
+          padding: "clamp(28px,6vw,48px)",
+          border: "1px solid #E5E7EB",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: "1.9rem",
+            fontWeight: 700,
+            color: "#1E1B4B",
+            marginBottom: 6,
+            textAlign: "center",
+          }}
+        >
           Sign in
         </h1>
-        <p style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", marginBottom: 32 }}>
+        <p
+          style={{
+            fontSize: 14,
+            color: "#6B7280",
+            textAlign: "center",
+            marginBottom: 32,
+          }}
+        >
           Welcome back to the SATI portal
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: 18 }}
+        >
+          {/* Email */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
+            <label
+              style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}
+            >
               Email
             </label>
             <input
@@ -92,12 +108,25 @@ export default function Login() {
               onChange={handleChange}
               placeholder="you@example.com"
               autoComplete="email"
-              style={{ padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--border)", fontSize: 14, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none" }}
+              style={{
+                padding: "11px 14px",
+                borderRadius: 10,
+                border: "1.5px solid #D1D5DB",
+                fontSize: 14,
+                background: "#F9FAFB",
+                color: "#111827",
+                outline: "none",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
+          {/* Password */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
+            <label
+              style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}
+            >
               Password
             </label>
             <input
@@ -107,22 +136,60 @@ export default function Login() {
               onChange={handleChange}
               placeholder="••••••••"
               autoComplete="current-password"
-              style={{ padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--border)", fontSize: 14, background: "var(--bg-subtle)", color: "var(--text-primary)", outline: "none" }}
+              style={{
+                padding: "11px 14px",
+                borderRadius: 10,
+                border: "1.5px solid #D1D5DB",
+                fontSize: 14,
+                background: "#F9FAFB",
+                color: "#111827",
+                outline: "none",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
+          {/* Submit button — explicit type="submit", no CSS variables */}
           <button
             type="submit"
             disabled={loading}
-            style={{ marginTop: 8, padding: "12px 0", borderRadius: 10, border: "none", background: loading ? "var(--primary-muted)" : "var(--primary)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", transition: "background 0.2s" }}
+            style={{
+              marginTop: 4,
+              padding: "13px 0",
+              borderRadius: 10,
+              border: "none",
+              background: loading ? "#818CF8" : "#4F46E5",
+              color: "#ffffff",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: loading ? "not-allowed" : "pointer",
+              transition: "background 0.2s",
+              width: "100%",
+              letterSpacing: "0.01em",
+            }}
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
-        <p style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "var(--text-muted)" }}>
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: 24,
+            fontSize: 13,
+            color: "#6B7280",
+          }}
+        >
           Don't have an account?{" "}
-          <Link to="/register" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+          <Link
+            to="/register"
+            style={{
+              color: "#4F46E5",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
             Register
           </Link>
         </p>
