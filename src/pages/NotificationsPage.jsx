@@ -15,32 +15,24 @@ function getAvatarColor(name = "") {
   return AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 }
 
-// FIX: Key used to persist an in-flight Accept/Reject action across a
-// token-expiry redirect. When the user clicks Accept and their JWT has expired,
-// the api.js interceptor fires before the response comes back, saves the
-// current path as redirectAfterLogin, and pushes to /login. On re-login,
-// Login.jsx navigates back to /notifications, and this component reads
-// PENDING_ACTION_KEY on mount and replays the action automatically.
-const PENDING_ACTION_KEY = "pendingConnectionAction";
-
-// FIX: Discard any saved pending action older than 10 minutes. Without this,
-// a stale action from a previous session (e.g. user closed the tab before
-// re-logging in) would spuriously replay days later.
-const PENDING_ACTION_TTL_MS = 10 * 60 * 1000;
-
+const PENDING_ACTION_KEY     = "pendingConnectionAction";
+const PENDING_ACTION_TTL_MS  = 10 * 60 * 1000; // 10 minutes
 const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
 
 export default function NotificationsPage() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
+
   const [requests, setRequests]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(new Set());
   const pollRef                     = useRef(null);
   const initialLoadDone             = useRef(false);
 
-  // ── Fetch pending requests ─────────────────────────────────────────────────
+  // ── Fetch pending incoming requests ───────────────────────────────────────
   const fetchRequests = useCallback(async (isRetry = false) => {
+    // Guard: don't fetch if user isn't hydrated yet
+    if (!user?.id) return;
     try {
       const res = await getConnectionRequests(user.id);
       setRequests(res.data || []);
@@ -49,7 +41,7 @@ export default function NotificationsPage() {
         setTimeout(() => fetchRequests(true), 2000);
         return;
       }
-      console.error(err);
+      console.error("fetchRequests error:", err);
       if (!initialLoadDone.current) toast.error("Failed to load notifications");
     } finally {
       if (!initialLoadDone.current) {
@@ -57,92 +49,77 @@ export default function NotificationsPage() {
         setLoading(false);
       }
     }
-  }, [user.id]);
+  }, [user?.id]);
 
-  // ── Core accept/reject handler (also called by the replay-on-mount effect) ──
+  // ── Core accept / reject ───────────────────────────────────────────────────
   const handleUpdate = useCallback(async (req, status) => {
+    if (!user?.id) return;
     const { id, senderId } = req;
     setProcessing(prev => new Set([...prev, id]));
     try {
       await updateConnectionRequest(id, status);
 
-      // Action succeeded — clear any saved pending action.
+      // Success — clear any saved pending action
       localStorage.removeItem(PENDING_ACTION_KEY);
-
       setRequests(prev => prev.filter(r => r.id !== id));
 
       if (status === "ACCEPTED") {
         localStorage.removeItem(`sentRequests_${user.id}`);
-        window.dispatchEvent(
-          new CustomEvent(CONNECTION_UPDATED_EVENT, {
-            detail: { type: "ACCEPTED", senderId, receiverId: user.id },
-          })
-        );
+        window.dispatchEvent(new CustomEvent(CONNECTION_UPDATED_EVENT, {
+          detail: { type: "ACCEPTED", senderId, receiverId: user.id },
+        }));
         toast.success("Connection accepted!");
       } else {
-        window.dispatchEvent(
-          new CustomEvent(CONNECTION_UPDATED_EVENT, {
-            detail: { type: "REJECTED", senderId, receiverId: user.id },
-          })
-        );
+        window.dispatchEvent(new CustomEvent(CONNECTION_UPDATED_EVENT, {
+          detail: { type: "REJECTED", senderId, receiverId: user.id },
+        }));
         toast.success("Request rejected");
       }
     } catch (err) {
-      console.error(err);
-      // If it's NOT a 401/403 (which would have already redirected via the
-      // interceptor), show an error and re-fetch.
+      console.error("handleUpdate error:", err);
       if (err.response?.status !== 401 && err.response?.status !== 403) {
         toast.error("Failed to update request");
         localStorage.removeItem(PENDING_ACTION_KEY);
         fetchRequests();
       }
-      // 401/403: interceptor already saved redirectAfterLogin and
-      // PENDING_ACTION_KEY and is redirecting to /login — nothing to do here.
+      // 401/403: interceptor already saved redirectAfterLogin → going to /login
     }
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
-  }, [user.id, fetchRequests]);
+  }, [user?.id, fetchRequests]);
 
-  // ── Mount effect: replay interrupted action, then start polling ────────────
+  // ── Mount: replay interrupted action, then poll ────────────────────────────
   useEffect(() => {
+    // Guard: wait until AuthContext has hydrated user.id
+    if (!user?.id) return;
+
     setLoading(true);
     initialLoadDone.current = false;
 
-    // FIX: The original code used replayAction().then(() => { fetchRequests(); startPolling(); })
-    // which caused a race: replayAction does its own getConnectionRequests call
-    // and sets state, then fetchRequests() immediately fires a second parallel
-    // request that could overwrite the post-replay state with stale data.
-    // Fixing this by awaiting everything sequentially inside an async IIFE,
-    // so fetchRequests() only runs after the replay (and its internal fetch)
-    // has fully settled.
     const run = async () => {
-      // ── Replay any action interrupted by token-expiry redirect ──────────
-      // Flow: user clicks Accept → token expired → interceptor saves
-      // pendingConnectionAction + redirectAfterLogin → user re-logs in →
-      // Login.jsx navigates to /notifications → this fires, replays action.
+      // ── 1. Try to replay a pending action saved before token-expiry redirect
       const saved = localStorage.getItem(PENDING_ACTION_KEY);
       if (saved) {
         let pending;
         try { pending = JSON.parse(saved); } catch { localStorage.removeItem(PENDING_ACTION_KEY); }
 
         if (pending) {
-          // FIX: Discard stale pending actions (older than TTL).
           const age = Date.now() - (pending.savedAt || 0);
           if (age > PENDING_ACTION_TTL_MS) {
+            // Stale — discard silently
             localStorage.removeItem(PENDING_ACTION_KEY);
           } else {
             try {
               const res = await getConnectionRequests(user.id);
-              const freshRequests = res.data || [];
-              setRequests(freshRequests);
+              const fresh = res.data || [];
+              setRequests(fresh);
               initialLoadDone.current = true;
               setLoading(false);
 
-              const stillPending = freshRequests.find(r => r.id === pending.requestId);
+              const stillPending = fresh.find(r => r.id === pending.requestId);
               if (stillPending) {
-                toast(`Replaying your "${pending.status.toLowerCase()}" action...`, { icon: "🔄" });
+                toast(`Replaying your "${pending.status.toLowerCase()}" action…`, { icon: "🔄" });
                 await handleUpdate(stillPending, pending.status);
               } else {
-                // Already handled server-side before the redirect completed.
                 localStorage.removeItem(PENDING_ACTION_KEY);
                 toast.success(
                   pending.status === "ACCEPTED"
@@ -158,29 +135,19 @@ export default function NotificationsPage() {
         }
       }
 
-      // ── Normal initial load (runs whether or not replay ran) ────────────
-      // initialLoadDone.current guards against flipping loading back to true
-      // if replay already set state above.
+      // ── 2. Normal initial fetch (initialLoadDone guard prevents double flip)
       await fetchRequests();
 
-      // ── Start polling ───────────────────────────────────────────────────
+      // ── 3. Start 5-second polling
       pollRef.current = setInterval(() => fetchRequests(), 5000);
     };
 
     run();
     return () => clearInterval(pollRef.current);
-  }, [fetchRequests, handleUpdate, user.id]);
+  }, [user?.id, fetchRequests, handleUpdate]);
 
-  // ── Button click handler — saves intent BEFORE the API call ───────────────
+  // ── Save intent BEFORE API call (token may expire synchronously) ──────────
   const handleUpdateWithSave = (req, status) => {
-    // FIX: Persist the intent to localStorage BEFORE the API call.
-    // If the token is expired the axios interceptor fires synchronously during
-    // the request and redirects to /login before our .catch() runs — so we
-    // can't save state in the catch block. Writing it here guarantees it's
-    // persisted regardless of whether the call succeeds or fails.
-    //
-    // FIX: Include savedAt timestamp so the replay logic can discard actions
-    // that are too old (e.g. user never re-logged in and tries again days later).
     localStorage.setItem(
       PENDING_ACTION_KEY,
       JSON.stringify({
@@ -272,16 +239,16 @@ export default function NotificationsPage() {
                     <button
                       onClick={() => handleUpdateWithSave(req, "ACCEPTED")}
                       disabled={isProcessing}
-                      style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
+                      style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#4F46E5", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >
-                      {isProcessing ? "..." : "Accept"}
+                      {isProcessing ? "…" : "Accept"}
                     </button>
                     <button
                       onClick={() => handleUpdateWithSave(req, "REJECTED")}
                       disabled={isProcessing}
                       style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: isProcessing ? "default" : "pointer", opacity: isProcessing ? 0.6 : 1 }}
                     >
-                      {isProcessing ? "..." : "Reject"}
+                      {isProcessing ? "…" : "Reject"}
                     </button>
                   </div>
                 </div>
