@@ -17,23 +17,31 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+
     // Wipe token and redirect to /login on auth failures UNLESS the call
     // opted out via skipAuthRedirect (used only for background polls so a
     // silent token expiry during polling doesn't kick the user out mid-browse).
     if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('name');
-      localStorage.removeItem('role');
-      localStorage.removeItem('id');
-
-      // FIX: Before redirecting, persist the URL the user was on so Login can
-      // redirect back to it after a successful re-authentication. Without this,
-      // the user always lands on the default dashboard and loses their context.
+      // FIX: Capture the current path BEFORE clearing auth or navigating.
+      // This must happen synchronously here — if we wait until after
+      // localStorage.removeItem or navigate(), the path may already have
+      // changed. window.location.pathname always reflects the page the user
+      // was on when the failed request was made.
       const currentPath = window.location.pathname + window.location.search;
       if (currentPath !== '/login' && currentPath !== '/register') {
         localStorage.setItem('redirectAfterLogin', currentPath);
       }
 
+      localStorage.removeItem('token');
+      localStorage.removeItem('name');
+      localStorage.removeItem('role');
+      localStorage.removeItem('id');
+
+      // FIX: Use window.location.href (hard redirect) instead of React
+      // Router's navigate(). A hard redirect guarantees that localStorage
+      // writes above are fully committed before the page changes. With
+      // React Router's navigate(), the component tree unmounts first and
+      // in some timing scenarios the localStorage write races with unmount.
       window.location.href = '/login';
     }
     return Promise.reject(error);

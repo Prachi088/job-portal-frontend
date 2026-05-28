@@ -17,12 +17,16 @@ function getAvatarColor(name = "") {
 
 // FIX: Key used to persist an in-flight Accept/Reject action across a
 // token-expiry redirect. When the user clicks Accept and their JWT has expired,
-// the api.js interceptor fires before the response comes back, clears
-// credentials, saves the current path as redirectAfterLogin, and pushes to
-// /login. On re-login, Login.jsx navigates back to /notifications, and this
-// component reads PENDING_ACTION_KEY on mount and replays the action
-// automatically — so the user never has to click Accept twice.
+// the api.js interceptor fires before the response comes back, saves the
+// current path as redirectAfterLogin, and pushes to /login. On re-login,
+// Login.jsx navigates back to /notifications, and this component reads
+// PENDING_ACTION_KEY on mount and replays the action automatically.
 const PENDING_ACTION_KEY = "pendingConnectionAction";
+
+// FIX: Discard any saved pending action older than 10 minutes. Without this,
+// a stale action from a previous session (e.g. user closed the tab before
+// re-logging in) would spuriously replay days later.
+const PENDING_ACTION_TTL_MS = 10 * 60 * 1000;
 
 const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
 
@@ -62,8 +66,7 @@ export default function NotificationsPage() {
     try {
       await updateConnectionRequest(id, status);
 
-      // FIX: If we get here, the action succeeded. Clear any pending action
-      // that was saved before a previous token-expiry redirect — it's done.
+      // Action succeeded — clear any saved pending action.
       localStorage.removeItem(PENDING_ACTION_KEY);
 
       setRequests(prev => prev.filter(r => r.id !== id));
@@ -87,87 +90,105 @@ export default function NotificationsPage() {
     } catch (err) {
       console.error(err);
       // If it's NOT a 401/403 (which would have already redirected via the
-      // interceptor), show an error and re-fetch. The interceptor handles the
-      // auth-failure path by saving PENDING_ACTION_KEY then going to /login.
+      // interceptor), show an error and re-fetch.
       if (err.response?.status !== 401 && err.response?.status !== 403) {
         toast.error("Failed to update request");
         localStorage.removeItem(PENDING_ACTION_KEY);
         fetchRequests();
       }
-      // 401/403: interceptor already saved redirectAfterLogin and PENDING_ACTION_KEY,
-      // and is about to redirect to /login — nothing else to do here.
+      // 401/403: interceptor already saved redirectAfterLogin and
+      // PENDING_ACTION_KEY and is redirecting to /login — nothing to do here.
     }
     setProcessing(prev => { const s = new Set(prev); s.delete(id); return s; });
   }, [user.id, fetchRequests]);
 
+  // ── Mount effect: replay interrupted action, then start polling ────────────
   useEffect(() => {
     setLoading(true);
     initialLoadDone.current = false;
 
-    // FIX: Replay any action that was interrupted by a token-expiry redirect.
-    // Flow: user clicks Accept → token expired → interceptor saves
-    // pendingConnectionAction + redirectAfterLogin → user re-logs in →
-    // Login.jsx navigates to /notifications → this effect fires, loads
-    // requests, then replays the saved action automatically.
-    const replayAction = async () => {
+    // FIX: The original code used replayAction().then(() => { fetchRequests(); startPolling(); })
+    // which caused a race: replayAction does its own getConnectionRequests call
+    // and sets state, then fetchRequests() immediately fires a second parallel
+    // request that could overwrite the post-replay state with stale data.
+    // Fixing this by awaiting everything sequentially inside an async IIFE,
+    // so fetchRequests() only runs after the replay (and its internal fetch)
+    // has fully settled.
+    const run = async () => {
+      // ── Replay any action interrupted by token-expiry redirect ──────────
+      // Flow: user clicks Accept → token expired → interceptor saves
+      // pendingConnectionAction + redirectAfterLogin → user re-logs in →
+      // Login.jsx navigates to /notifications → this fires, replays action.
       const saved = localStorage.getItem(PENDING_ACTION_KEY);
-      if (!saved) return;
+      if (saved) {
+        let pending;
+        try { pending = JSON.parse(saved); } catch { localStorage.removeItem(PENDING_ACTION_KEY); }
 
-      let pending;
-      try { pending = JSON.parse(saved); } catch { localStorage.removeItem(PENDING_ACTION_KEY); return; }
+        if (pending) {
+          // FIX: Discard stale pending actions (older than TTL).
+          const age = Date.now() - (pending.savedAt || 0);
+          if (age > PENDING_ACTION_TTL_MS) {
+            localStorage.removeItem(PENDING_ACTION_KEY);
+          } else {
+            try {
+              const res = await getConnectionRequests(user.id);
+              const freshRequests = res.data || [];
+              setRequests(freshRequests);
+              initialLoadDone.current = true;
+              setLoading(false);
 
-      // Wait for the fresh request list to arrive before replaying.
-      try {
-        const res = await getConnectionRequests(user.id);
-        const freshRequests = res.data || [];
-        setRequests(freshRequests);
-        initialLoadDone.current = true;
-        setLoading(false);
-
-        // Only replay if the request is still pending (wasn't already processed
-        // server-side before the redirect completed).
-        const stillPending = freshRequests.find(r => r.id === pending.requestId);
-        if (stillPending) {
-          toast(`Replaying your "${pending.status.toLowerCase()}" action...`, { icon: "🔄" });
-          await handleUpdate(stillPending, pending.status);
-        } else {
-          // The action may have gone through before the redirect, or the request
-          // was already handled another way — either way it's gone from pending.
-          localStorage.removeItem(PENDING_ACTION_KEY);
-          toast.success(
-            pending.status === "ACCEPTED"
-              ? "Connection was already accepted!"
-              : "Request was already handled."
-          );
+              const stillPending = freshRequests.find(r => r.id === pending.requestId);
+              if (stillPending) {
+                toast(`Replaying your "${pending.status.toLowerCase()}" action...`, { icon: "🔄" });
+                await handleUpdate(stillPending, pending.status);
+              } else {
+                // Already handled server-side before the redirect completed.
+                localStorage.removeItem(PENDING_ACTION_KEY);
+                toast.success(
+                  pending.status === "ACCEPTED"
+                    ? "Connection was already accepted!"
+                    : "Request was already handled."
+                );
+              }
+            } catch (err) {
+              console.error("Replay failed:", err);
+              localStorage.removeItem(PENDING_ACTION_KEY);
+            }
+          }
         }
-      } catch (err) {
-        console.error("Replay failed:", err);
-        localStorage.removeItem(PENDING_ACTION_KEY);
       }
+
+      // ── Normal initial load (runs whether or not replay ran) ────────────
+      // initialLoadDone.current guards against flipping loading back to true
+      // if replay already set state above.
+      await fetchRequests();
+
+      // ── Start polling ───────────────────────────────────────────────────
+      pollRef.current = setInterval(() => fetchRequests(), 5000);
     };
 
-    replayAction().then(() => {
-      // If replayAction handled the load, fetchRequests is still needed to
-      // start the polling interval — but we don't want it to flip loading
-      // back to true. initialLoadDone.current guards that.
-      fetchRequests();
-      pollRef.current = setInterval(() => fetchRequests(), 5000);
-    });
-
+    run();
     return () => clearInterval(pollRef.current);
   }, [fetchRequests, handleUpdate, user.id]);
 
-  // ── Button click handler — saves intent before the API call in case the
-  //    token is expired and the interceptor fires before a response arrives ───
+  // ── Button click handler — saves intent BEFORE the API call ───────────────
   const handleUpdateWithSave = (req, status) => {
     // FIX: Persist the intent to localStorage BEFORE the API call.
-    // If the token is expired, the axios interceptor fires synchronously
-    // during the request and redirects to /login before our .catch() runs —
-    // so we can't save state in the catch block. Writing it here guarantees
-    // it's persisted regardless of whether the call succeeds or fails.
+    // If the token is expired the axios interceptor fires synchronously during
+    // the request and redirects to /login before our .catch() runs — so we
+    // can't save state in the catch block. Writing it here guarantees it's
+    // persisted regardless of whether the call succeeds or fails.
+    //
+    // FIX: Include savedAt timestamp so the replay logic can discard actions
+    // that are too old (e.g. user never re-logged in and tries again days later).
     localStorage.setItem(
       PENDING_ACTION_KEY,
-      JSON.stringify({ requestId: req.id, senderId: req.senderId, status })
+      JSON.stringify({
+        requestId: req.id,
+        senderId:  req.senderId,
+        status,
+        savedAt:   Date.now(),
+      })
     );
     handleUpdate(req, status);
   };
