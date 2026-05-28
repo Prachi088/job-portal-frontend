@@ -4,11 +4,19 @@ const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL
 });
 
+// Token getter — reads from localStorage every request (always fresh)
+const getToken = () => localStorage.getItem('token');
+
 API.interceptors.request.use((req) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   if (token) {
     req.headers = req.headers || {};
     req.headers.Authorization = `Bearer ${token}`;
+  }
+  // Debug: log every outgoing request so you can see if token is missing
+  if (import.meta.env.DEV) {
+    console.log(`[API] ${req.method?.toUpperCase()} ${req.url}`,
+      token ? '✓ token present' : '✗ NO TOKEN');
   }
   return req;
 });
@@ -17,6 +25,11 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+
+    if (import.meta.env.DEV) {
+      console.warn(`[API] ${status} error on ${error.config?.url}`,
+        'skipAuthRedirect:', !!error.config?.skipAuthRedirect);
+    }
 
     if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
       const currentPath = window.location.pathname + window.location.search;
@@ -96,15 +109,15 @@ export const downloadResume = (id) =>
   API.get(`/api/users/${id}/resume`, { responseType: 'blob' });
 
 // ── Events ────────────────────────────────────────────────────────────────────
-export const createEvent                  = (data)              => API.post('/api/events', data);
-export const getAllEvents                  = ()                  => API.get('/api/events');
-export const getEventsByRecruiter         = (recruiterId)       => API.get(`/api/events/recruiter/${recruiterId}`);
-export const getEventById                 = (id)                => API.get(`/api/events/${id}`);
-export const deleteEvent                  = (id)                => API.delete(`/api/events/${id}`);
-export const registerForEvent             = (eventId, userId)   => API.post(`/api/events/${eventId}/register`, { userId });
-export const getEventApplications         = (eventId)           => API.get(`/api/events/${eventId}/applications`);
-export const getUserEventApplications     = (userId)            => API.get(`/api/events/user/${userId}/applications`);
-export const updateEventApplicationStatus = (applicationId, status) =>
+export const createEvent                  = (data)                      => API.post('/api/events', data);
+export const getAllEvents                  = ()                          => API.get('/api/events');
+export const getEventsByRecruiter         = (recruiterId)               => API.get(`/api/events/recruiter/${recruiterId}`);
+export const getEventById                 = (id)                        => API.get(`/api/events/${id}`);
+export const deleteEvent                  = (id)                        => API.delete(`/api/events/${id}`);
+export const registerForEvent             = (eventId, userId)           => API.post(`/api/events/${eventId}/register`, { userId });
+export const getEventApplications         = (eventId)                   => API.get(`/api/events/${eventId}/applications`);
+export const getUserEventApplications     = (userId)                    => API.get(`/api/events/user/${userId}/applications`);
+export const updateEventApplicationStatus = (applicationId, status)     =>
   API.put(`/api/events/applications/${applicationId}/status`, { status });
 
 // ── Connections ───────────────────────────────────────────────────────────────
@@ -112,20 +125,19 @@ export const getAllUsers = () => API.get('/api/connections/users/all');
 
 export const sendConnectionRequest = (senderId, receiverId) =>
   API.post('/api/connections/request', {
-    senderId: Number(senderId),
+    senderId:   Number(senderId),
     receiverId: Number(receiverId),
   });
 
-// Background polls — skipAuthRedirect so expired token doesn't kick user out
+// Background polls — skipAuthRedirect: true so expired token never kicks user out
 export const getConnectionRequests = (userId) =>
   API.get(`/api/connections/requests/${userId}`, { skipAuthRedirect: true });
 
 export const getSentRequests = (userId) =>
   API.get(`/api/connections/requests/sent/${userId}`, { skipAuthRedirect: true });
 
-// FIX: skipAuthRedirect: true so Accept/Reject never redirects to /login.
-// If the token is expired, the error is caught in NotificationsPage and a
-// toast is shown instead — user stays on the page.
+// skipAuthRedirect: true — Accept/Reject must NEVER redirect to login.
+// On 401/403 the error is caught in NotificationsPage and a toast is shown.
 export const updateConnectionRequest = (id, status) =>
   API.put(`/api/connections/request/${id}`, { status }, { skipAuthRedirect: true });
 
