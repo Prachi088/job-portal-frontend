@@ -19,22 +19,14 @@ API.interceptors.response.use(
     const status = error.response?.status;
 
     if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
-      // STEP 1 — capture path FIRST, before anything else changes
       const currentPath = window.location.pathname + window.location.search;
-
-      // STEP 2 — save it (skip saving if already on auth pages)
       if (currentPath !== '/login' && currentPath !== '/register') {
         localStorage.setItem('redirectAfterLogin', currentPath);
       }
-
-      // STEP 3 — clear credentials
       localStorage.removeItem('token');
       localStorage.removeItem('name');
       localStorage.removeItem('role');
       localStorage.removeItem('id');
-
-      // STEP 4 — hard redirect (NOT React Router navigate)
-      // window.location.href guarantees localStorage writes finish before unload
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -104,15 +96,15 @@ export const downloadResume = (id) =>
   API.get(`/api/users/${id}/resume`, { responseType: 'blob' });
 
 // ── Events ────────────────────────────────────────────────────────────────────
-export const createEvent                  = (data)                      => API.post('/api/events', data);
-export const getAllEvents                  = ()                          => API.get('/api/events');
-export const getEventsByRecruiter         = (recruiterId)               => API.get(`/api/events/recruiter/${recruiterId}`);
-export const getEventById                 = (id)                        => API.get(`/api/events/${id}`);
-export const deleteEvent                  = (id)                        => API.delete(`/api/events/${id}`);
-export const registerForEvent             = (eventId, userId)           => API.post(`/api/events/${eventId}/register`, { userId });
-export const getEventApplications         = (eventId)                   => API.get(`/api/events/${eventId}/applications`);
-export const getUserEventApplications     = (userId)                    => API.get(`/api/events/user/${userId}/applications`);
-export const updateEventApplicationStatus = (applicationId, status)     =>
+export const createEvent                  = (data)              => API.post('/api/events', data);
+export const getAllEvents                  = ()                  => API.get('/api/events');
+export const getEventsByRecruiter         = (recruiterId)       => API.get(`/api/events/recruiter/${recruiterId}`);
+export const getEventById                 = (id)                => API.get(`/api/events/${id}`);
+export const deleteEvent                  = (id)                => API.delete(`/api/events/${id}`);
+export const registerForEvent             = (eventId, userId)   => API.post(`/api/events/${eventId}/register`, { userId });
+export const getEventApplications         = (eventId)           => API.get(`/api/events/${eventId}/applications`);
+export const getUserEventApplications     = (userId)            => API.get(`/api/events/user/${userId}/applications`);
+export const updateEventApplicationStatus = (applicationId, status) =>
   API.put(`/api/events/applications/${applicationId}/status`, { status });
 
 // ── Connections ───────────────────────────────────────────────────────────────
@@ -124,20 +116,24 @@ export const sendConnectionRequest = (senderId, receiverId) =>
     receiverId: Number(receiverId),
   });
 
+// Background polls — skipAuthRedirect so expired token doesn't kick user out
 export const getConnectionRequests = (userId) =>
   API.get(`/api/connections/requests/${userId}`, { skipAuthRedirect: true });
 
 export const getSentRequests = (userId) =>
   API.get(`/api/connections/requests/sent/${userId}`, { skipAuthRedirect: true });
 
+// FIX: skipAuthRedirect: true so Accept/Reject never redirects to /login.
+// If the token is expired, the error is caught in NotificationsPage and a
+// toast is shown instead — user stays on the page.
 export const updateConnectionRequest = (id, status) =>
-  API.put(`/api/connections/request/${id}`, { status });
+  API.put(`/api/connections/request/${id}`, { status }, { skipAuthRedirect: true });
 
 export const getConnections = (userId) =>
   API.get(`/api/connections/${userId}`, { skipAuthRedirect: true });
 
 // ── Messages ──────────────────────────────────────────────────────────────────
-export const sendMsg          = (data)               => API.post('/api/messages', data);
-export const getConversation  = (user1, user2)       => API.get(`/api/messages/conversation/${user1}/${user2}`);
+export const sendMsg          = (data)                 => API.post('/api/messages', data);
+export const getConversation  = (user1, user2)         => API.get(`/api/messages/conversation/${user1}/${user2}`);
 export const markMessagesRead = (senderId, receiverId) => API.put(`/api/messages/read/${senderId}/${receiverId}`);
-export const getUnreadCount   = (userId)             => API.get(`/api/messages/unread/${userId}`);
+export const getUnreadCount   = (userId)               => API.get(`/api/messages/unread/${userId}`);
