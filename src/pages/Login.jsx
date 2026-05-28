@@ -8,8 +8,9 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [form, setForm]       = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false);
+  const [form, setForm]             = useState({ email: "", password: "" });
+  const [loading, setLoading]       = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -28,12 +29,8 @@ export default function Login() {
       login(data);
       toast.success("Welcome back!");
 
-      // FIX: Honour the saved redirect path written by api.js on 401 expiry.
-      // Without this the user always lands on the dashboard and the pending
-      // Accept action in NotificationsPage is never replayed.
       const savedRedirect = localStorage.getItem("redirectAfterLogin");
       localStorage.removeItem("redirectAfterLogin");
-
       const defaultPath = data.role === "RECRUITER" ? "/recruiter" : "/jobs";
       navigate(savedRedirect || defaultPath, { replace: true });
 
@@ -96,9 +93,7 @@ export default function Login() {
         >
           {/* Email */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label
-              style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}
-            >
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Email
             </label>
             <input
@@ -122,35 +117,72 @@ export default function Login() {
             />
           </div>
 
-          {/* Password */}
+          {/* Password with eye toggle */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label
-              style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}
-            >
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Password
             </label>
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              style={{
-                padding: "11px 14px",
-                borderRadius: 10,
-                border: "1.5px solid #D1D5DB",
-                fontSize: 14,
-                background: "#F9FAFB",
-                color: "#111827",
-                outline: "none",
-                width: "100%",
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                style={{
+                  padding: "11px 44px 11px 14px",
+                  borderRadius: 10,
+                  border: "1.5px solid #D1D5DB",
+                  fontSize: 14,
+                  background: "#F9FAFB",
+                  color: "#111827",
+                  outline: "none",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              />
+              {/* Eye toggle button */}
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                style={{
+                  position: "absolute",
+                  right: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 4,
+                  color: "#9CA3AF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  /* Eye-off icon */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  /* Eye icon */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Submit button — explicit type="submit", no CSS variables */}
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
@@ -184,11 +216,7 @@ export default function Login() {
           Don't have an account?{" "}
           <Link
             to="/register"
-            style={{
-              color: "#4F46E5",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
+            style={{ color: "#4F46E5", fontWeight: 600, textDecoration: "none" }}
           >
             Register
           </Link>
