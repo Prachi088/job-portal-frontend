@@ -7,6 +7,25 @@ const API = axios.create({
 // Token getter — reads from localStorage every request (always fresh)
 const getToken = () => localStorage.getItem('token');
 
+// FIX: Exported so callers (e.g. NotificationsPage) can do a pre-flight
+// expiry check before making a request, allowing them to show a clean
+// "session expired" message instead of catching a 401 from the server.
+// We ONLY decode the payload for the exp claim — we never trust client-side
+// JWT parsing for any auth decision; the server always re-validates.
+export function isTokenExpired() {
+  const token = localStorage.getItem('token');
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(
+      atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    // payload.exp is in seconds; Date.now() is milliseconds
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 API.interceptors.request.use((req) => {
   const token = getToken();
   if (token) {
@@ -136,8 +155,9 @@ export const getConnectionRequests = (userId) =>
 export const getSentRequests = (userId) =>
   API.get(`/api/connections/requests/sent/${userId}`, { skipAuthRedirect: true });
 
-// skipAuthRedirect: true — Accept/Reject must NEVER redirect to login.
-// On 401/403 the error is caught in NotificationsPage and a toast is shown.
+// skipAuthRedirect: true — Accept/Reject must NEVER redirect to login via the
+// global interceptor. The NotificationsPage catch block handles 401/403 itself
+// by showing a toast and staying on the page.
 export const updateConnectionRequest = (id, status) =>
   API.put(`/api/connections/request/${id}`, { status }, { skipAuthRedirect: true });
 

@@ -17,6 +17,23 @@ function getAvatarColor(name = "") {
 
 const CONNECTION_UPDATED_EVENT = "connectionStateUpdated";
 
+// Pre-flight check: decode JWT expiry without a library.
+// We never trust this for auth decisions — the server validates the signature.
+// This is only used to show a friendly message before making a doomed request.
+function isTokenExpired() {
+  const token = localStorage.getItem("token");
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    // payload.exp is in seconds; Date.now() is in milliseconds
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export default function NotificationsPage() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
@@ -67,6 +84,19 @@ export default function NotificationsPage() {
   // ── Accept / Reject ───────────────────────────────────────────────────────
   const handleUpdate = useCallback(async (req, status) => {
     if (!user?.id) return;
+
+    // FIX: Pre-flight token expiry check.
+    // If the token is already expired, show a friendly message and stop here.
+    // This prevents a guaranteed 401 from the server and avoids the old
+    // behaviour of catching that 401 and forcibly redirecting to /login.
+    if (isTokenExpired()) {
+      toast.error(
+        "Your session has expired. Please refresh the page and log in again.",
+        { duration: 5000 }
+      );
+      return;
+    }
+
     const { id, senderId } = req;
 
     setProcessing(prev => new Set([...prev, id]));
@@ -83,7 +113,12 @@ export default function NotificationsPage() {
       setRequests(prev => prev.filter(r => r.id !== id));
 
       if (status === "ACCEPTED") {
+        // Clear the sender's sent-requests cache so their ConnectPage
+        // reflects the new connection state immediately on next load.
         localStorage.removeItem(`sentRequests_${user.id}`);
+
+        // Notify ConnectionsPage (and any other listener) that a new
+        // connection was just created so they can re-fetch without a reload.
         window.dispatchEvent(new CustomEvent(CONNECTION_UPDATED_EVENT, {
           detail: { type: "ACCEPTED", senderId, receiverId: user.id },
         }));
@@ -109,11 +144,24 @@ export default function NotificationsPage() {
           { duration: 6000 }
         );
       } else if (statusCode === 401 || statusCode === 403) {
-        // Token issue — show toast, stay on page (skipAuthRedirect is set)
-        toast.error("Session expired. Please log in again.", { duration: 4000 });
-        setTimeout(() => { window.location.href = "/login"; }, 2500);
+        // FIX: Do NOT redirect to /login here.
+        // skipAuthRedirect: true is already set on updateConnectionRequest in
+        // api.js, so the global interceptor won't fire. We just show a message
+        // and let the user decide what to do next. Forcing a redirect was
+        // causing the "session expired" logout loop even when the token was
+        // valid, because any transient 401 (e.g. clock skew, cold-start race)
+        // would kick the user out entirely.
+        toast.error(
+          "Could not verify your session. Please refresh the page and try again.",
+          { duration: 5000 }
+        );
+        // Re-fetch so the list stays consistent (the request may or may not
+        // have been processed before the error).
+        fetchRequests();
       } else {
-        toast.error(`Failed to update request (${statusCode || "unknown error"}). Try again.`);
+        toast.error(
+          `Failed to update request (${statusCode || "unknown error"}). Try again.`
+        );
         fetchRequests();
       }
     }
