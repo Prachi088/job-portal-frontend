@@ -40,9 +40,12 @@ function formatTime(dt) {
   return `${dateStr}, ${timeStr}`;
 }
 
+// TIMEZONE FIX: backend returns UTC without "Z" suffix, so we add it
+// so JavaScript treats it as UTC instead of local time (IST = UTC+5:30)
 function formatLastSeen(lastSeenAt) {
   if (!lastSeenAt) return "Offline";
-  const diff = Date.now() - new Date(lastSeenAt).getTime();
+  const utcStr = lastSeenAt.endsWith("Z") ? lastSeenAt : lastSeenAt + "Z";
+  const diff  = Date.now() - new Date(utcStr).getTime();
   const mins  = Math.floor(diff / 60_000);
   const hours = Math.floor(diff / 3_600_000);
   const days  = Math.floor(diff / 86_400_000);
@@ -168,14 +171,7 @@ function HeaderMenu({ onDeleteChat, onRemoveConnection, onViewProfile }) {
           background: "var(--bg-surface)", border: "1px solid var(--border)",
           borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
           minWidth: 190, zIndex: 200, overflow: "hidden",
-          animation: "fadeSlideDown 0.12s ease",
         }}>
-          <style>{`
-            @keyframes fadeSlideDown {
-              from { opacity: 0; transform: translateY(-6px); }
-              to   { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
           {items.map((item, i) => (
             <button
               key={i}
@@ -224,10 +220,8 @@ export default function ChatPage() {
   const pollRef              = useRef(null);
   const presRef              = useRef(null);
   const messagesContainerRef = useRef(null);
-  // FIX #2: track whether user is near bottom so poll doesn't yank them up
   const isNearBottom         = useRef(true);
 
-  // FIX #2: update isNearBottom on scroll
   const handleScroll = useCallback(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
@@ -262,7 +256,6 @@ export default function ChatPage() {
       setLoading(true);
       await Promise.all([fetchMessages(), fetchPresence()]);
       setLoading(false);
-      // FIX: instant scroll on first load (no smooth, avoids flash)
       setTimeout(() => scrollToBottom("instant"), 0);
     };
     init();
@@ -275,12 +268,9 @@ export default function ChatPage() {
     };
   }, [fetchMessages, fetchPresence, scrollToBottom]);
 
-  // FIX #2: only scroll to bottom on new messages if user is already near bottom
   useEffect(() => {
     if (loading) return;
-    if (isNearBottom.current) {
-      scrollToBottom("smooth");
-    }
+    if (isNearBottom.current) scrollToBottom("smooth");
   }, [messages, loading, scrollToBottom]);
 
   const handleSend = async () => {
@@ -299,7 +289,6 @@ export default function ChatPage() {
       optimistic: true,
     };
 
-    // always scroll to bottom when user sends
     isNearBottom.current = true;
     setMessages(prev => [...prev, optimistic]);
 
@@ -348,7 +337,6 @@ export default function ChatPage() {
   }, {});
 
   return (
-    // FIX #3: use dvh instead of vh for correct mobile height (accounts for browser chrome)
     <div style={{ height: "calc(100dvh - 62px)", minHeight: 0, display: "flex", flexDirection: "column", background: "var(--bg)" }}>
 
       {/* ── Header ── */}
@@ -357,8 +345,7 @@ export default function ChatPage() {
         borderBottom: "1px solid var(--border)",
         padding: "10px clamp(14px,4vw,24px)",
         display: "flex", alignItems: "center", gap: 10,
-        boxShadow: "var(--shadow-sm)",
-        flexShrink: 0,
+        boxShadow: "var(--shadow-sm)", flexShrink: 0,
       }}>
         <button
           onClick={() => navigate("/connected")}
@@ -415,22 +402,14 @@ export default function ChatPage() {
       </div>
 
       {/* ── Messages ── */}
-      {/* FIX #1: data-lenis-prevent="true" + explicit overscroll-behavior to stop Lenis interference */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
         data-lenis-prevent
-        data-lenis-prevent="true"
         style={{
-          flex: 1,
-          overflowY: "auto",
-          overscrollBehavior: "contain",   // FIX #1: stops Lenis/body scroll bleed
+          flex: 1, overflowY: "auto", overscrollBehavior: "contain",
           padding: "clamp(12px,3vw,20px) clamp(14px,4vw,24px)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          // FIX: explicit min-height:0 so flex child can actually shrink and scroll
-          minHeight: 0,
+          display: "flex", flexDirection: "column", gap: 4, minHeight: 0,
         }}
       >
         {loading ? (
@@ -496,12 +475,10 @@ export default function ChatPage() {
 
       {/* ── Input ── */}
       <div style={{
-        background: "var(--bg-surface)",
-        borderTop: "1px solid var(--border)",
+        background: "var(--bg-surface)", borderTop: "1px solid var(--border)",
         padding: "clamp(10px,2vw,14px) clamp(14px,4vw,24px)",
         paddingBottom: "max(clamp(10px,2vw,14px), env(safe-area-inset-bottom, 10px))",
-        display: "flex", gap: 10, alignItems: "center",
-        flexShrink: 0,
+        display: "flex", gap: 10, alignItems: "center", flexShrink: 0,
       }}>
         <input
           ref={inputRef}
