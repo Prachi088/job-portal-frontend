@@ -1,6 +1,5 @@
 
 import axios from 'axios';
-
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL
 });
@@ -307,4 +306,35 @@ export const markMessagesRead = (
 export const getUnreadCount = (userId) =>
   API.get(`/api/messages/unread/${userId}`);
 
+// ── Presence ──────────────────────────────────────────────────────────────────
+// GET /api/users/:userId/presence  →  { isOnline: bool, lastSeenAt: ISO|null }
+export const getUserPresence = (userId) =>
+  API.get(`/api/users/${userId}/presence`, { skipAuthRedirect: true });
+
+// ── Chat management ───────────────────────────────────────────────────────────
+// DELETE /api/messages/conversation  →  clears all messages between two users
+export const deleteConversation = (userId, otherId) =>
+  API.delete(`/api/messages/conversation`, {
+    data: { userId: Number(userId), otherId: Number(otherId) },
+  });
+
+// DELETE /api/connections  →  removes the connection between two users
+export const removeConnection = (userId, otherId) =>
+  API.delete(`/api/connections`, {
+    data: { userId: Number(userId), otherId: Number(otherId) },
+  });
+  // ── Notifications ─────────────────────────────────────────────────────────────
+// Add these to your existing api.js, above the export default line
+
+export const getNotifications = (userId) =>
+  API.get(`/api/notifications/${userId}`, { skipAuthRedirect: true });
+
+export const getNotificationUnreadCount = (userId) =>
+  API.get(`/api/notifications/${userId}/unread-count`, { skipAuthRedirect: true });
+
+export const markAllNotificationsRead = (userId) =>
+  API.put(`/api/notifications/${userId}/mark-read`);
+
+export const markOneNotificationRead = (notificationId) =>
+  API.put(`/api/notifications/read/${notificationId}`);
 export default API;

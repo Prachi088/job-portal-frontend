@@ -836,3 +836,131 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 500; letter-spacing:
     justify-content: flex-end;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPREHENSIVE MOBILE RESPONSIVE STYLES
+   Targets: ≤767px (phones), 768-1023px (tablets)
+   Zero logic changes — layout & spacing only
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Touch / tap target safety ── */
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"] { min-height: 44px; }
+  input, textarea, select    { min-height: 44px; font-size: 16px !important; }
+}
+
+/* ── Prevent horizontal overflow globally on mobile ── */
+@media (max-width: 767px) {
+  html, body { overflow-x: hidden; }
+
+  /* ── Navbar ── */
+  .nav-desktop-links,
+  .nav-desktop-user  { display: none !important; }
+  .nav-mobile-right  { display: flex !important; align-items: center; gap: 10px; }
+
+  /* ── Hero / Search ── */
+  .hero                { padding: clamp(24px,6vw,36px) clamp(14px,4vw,20px) !important; }
+  .hero h1             { font-size: clamp(1.4rem,6vw,1.9rem) !important; }
+  .hero p              { font-size: 13px !important; margin-bottom: 14px !important; }
+  .search-box          { max-width: 100% !important; }
+  .search-box input    { padding: 12px 12px 12px 40px !important; font-size: 14px !important; }
+  .filter-chips        { gap: 6px !important; }
+  .chip                { padding: 5px 12px !important; font-size: 11px !important; }
+
+  /* ── Stats ── */
+  .stats-row  { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .stat-card  { padding: 14px 10px !important; }
+  .stat-num   { font-size: clamp(20px,5vw,26px) !important; }
+  .stat-lbl   { font-size: 9px !important; }
+
+  /* ── Page wrap ── */
+  .page-wrap  { padding: 14px !important; }
+
+  /* ── Job cards ── */
+  .job-card         { padding: 14px 14px !important; flex-direction: column !important; gap: 12px !important; }
+  .job-card-body    { flex-direction: row !important; gap: 10px !important; }
+  .job-actions      { flex-direction: row !important; align-items: center !important; width: 100% !important; justify-content: space-between !important; }
+  .btn-apply        { flex: 1 !important; text-align: center !important; padding: 10px 12px !important; font-size: 12.5px !important; }
+  .btn-applied      { flex: 1 !important; text-align: center !important; padding: 10px 12px !important; font-size: 12.5px !important; }
+  .btn-save         { padding: 9px 12px !important; }
+  .co-avatar        { width: 40px !important; height: 40px !important; font-size: 15px !important; border-radius: 10px !important; }
+  .job-title        { font-size: 14px !important; }
+  .job-desc         { font-size: 12px !important; }
+  .job-tags         { gap: 4px !important; }
+  .tag              { font-size: 10px !important; padding: 2px 8px !important; }
+
+  /* ── Auth cards ── */
+  .auth-page        { padding: 16px !important; }
+  .auth-card        { padding: clamp(20px,5vw,28px) !important; border-radius: var(--r-lg) !important; }
+  .auth-title       { font-size: 20px !important; }
+
+  /* ── Form grid ── */
+  .form-grid        { grid-template-columns: 1fr !important; }
+  .form-card        { padding: 18px !important; }
+
+  /* ── Dashboard hero ── */
+  .dash-hero        { padding: 24px 16px !important; }
+  .dash-hero-inner  { flex-direction: column !important; gap: 14px !important; align-items: flex-start !important; }
+  .dash-hero h1     { font-size: 1.4rem !important; }
+
+  /* ── Chat FAB / window ── */
+  .chat-fab         { bottom: 16px !important; right: 16px !important; width: 48px !important; height: 48px !important; }
+  .chat-window      { right: 12px !important; width: calc(100vw - 24px) !important; bottom: 80px !important; }
+
+  /* ── About page sections ── */
+  .about-section-inner { padding: 0 14px !important; }
+
+  /* ── Footer ── */
+  .footer-grid      { grid-template-columns: 1fr !important; gap: 24px !important; }
+
+  /* ── Recruiter / Events dashboard cards ── */
+  .rec-stats-grid   { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .rec-tabs         { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; padding-bottom: 2px !important; }
+  .rec-tab-btn      { white-space: nowrap !important; flex-shrink: 0 !important; }
+
+  /* ── Profile page ── */
+  .profile-header-inner { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+  .profile-skills-grid  { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Connect / People cards ── */
+  .people-grid      { grid-template-columns: 1fr !important; gap: 10px !important; }
+
+  /* ── Event cards ── */
+  .event-card       { padding: 16px !important; }
+  .event-card-inner { flex-direction: column !important; gap: 10px !important; }
+
+  /* ── Notifications ── */
+  .notif-item       { padding: 14px !important; }
+  .notif-actions    { flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; }
+  .notif-btn        { flex: 1 !important; min-width: 80px !important; text-align: center !important; }
+
+  /* ── Toolbar ── */
+  .toolbar          { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+  .sort-btn         { width: 100% !important; }
+
+  /* ── Applications stat cards ── */
+  .app-stat-grid    { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+
+  /* ── My Applications cards ── */
+  .app-card         { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+  .app-card .status { align-self: flex-end !important; }
+}
+
+/* ── Tablet (768–1023px) ── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .stats-row        { grid-template-columns: repeat(2,1fr) !important; }
+  .page-wrap        { padding: 20px !important; }
+  .rec-stats-grid   { grid-template-columns: 1fr 1fr !important; }
+  .people-grid      { grid-template-columns: repeat(2,1fr) !important; }
+  .form-grid        { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Very small phones (≤400px) ── */
+@media (max-width: 400px) {
+  .stats-row        { grid-template-columns: 1fr 1fr !important; }
+  .hero h1          { font-size: 1.3rem !important; }
+  .job-card-body    { gap: 8px !important; }
+  .co-avatar        { width: 36px !important; height: 36px !important; font-size: 13px !important; }
+  .btn-apply        { font-size: 12px !important; padding: 9px 10px !important; }
+  .tag              { font-size: 9.5px !important; }
+}

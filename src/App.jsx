@@ -140,7 +140,24 @@ function Layout() {
   const location = useLocation();
   const hideNav = ["/login", "/register", "/about"].includes(location.pathname);
 
+  // FIX: detect chat route to hide footer, chatbox, and skip AnimatedPage wrapper
+  const isChatRoute = location.pathname.startsWith("/chat/");
+
   useEffect(() => { createLenis(); }, []);
+
+  // FIX: Chat page gets its own full-screen layout — no footer, no chatbox, no AnimatedPage
+  if (isChatRoute) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden" }}>
+        <ParticleBackground />
+        <Toaster position="top-right" />
+        <Navbar />
+        <Routes>
+          <Route path="/chat/:otherId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        </Routes>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -171,11 +188,9 @@ function Layout() {
             <Route path="/my-jobs" element={<ProtectedRoute><MyJobs /></ProtectedRoute>} />
             <Route path="/my-events" element={<ProtectedRoute><MyEvents /></ProtectedRoute>} />
 
-            {/* New networking routes */}
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/connected" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
-            <Route path="/chat/:otherId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/about" replace />} />
           </Routes>

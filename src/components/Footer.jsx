@@ -155,9 +155,9 @@ export default function Footer() {
             </div>
             <div style={s.contactNote}>
               <p style={s.contactLabel}>Get in touch</p>
-              <a href="mailto:alumni@sati.ac.in" style={s.emailLink}>
-                alumni@sati.ac.in
-              </a>
+             <a href="mailto:prachirajput44269@gmail.com" style={s.emailLink}>
+             Contact Us
+             </a>
             </div>
           </div>
         </div>

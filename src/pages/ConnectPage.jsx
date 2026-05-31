@@ -302,7 +302,7 @@ export default function ConnectPage() {
         </p>
 
         {loading ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px,100%), 1fr))", gap: 16 }}>
             {[1,2,3,4,5,6].map((i) => (
               <div key={i} style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", height: 180 }} />
             ))}
@@ -313,7 +313,7 @@ export default function ConnectPage() {
             <p style={{ fontSize: 13 }}>Try adjusting your filters</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px,100%), 1fr))", gap: 16 }}>
             {filtered.map((u) => {
               const avatarColor = getAvatarColor(u.name);
               const roleConfig  = ROLE_COLORS[u.role] || ROLE_COLORS.STUDENT;
@@ -387,7 +387,8 @@ export default function ConnectPage() {
                     disabled={btnState === "connected" || btnState === "sent"}
                     style={{
                       marginTop: "auto",
-                      padding: "9px 0",
+                      padding: "11px 0",
+                      minHeight: 44,
                       borderRadius: 10,
                       border: btnState === "connected"
                         ? "1px solid var(--success-border)"

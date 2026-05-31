@@ -86,13 +86,15 @@ export default function Navbar() {
     <>
       <nav style={styles.nav}>
         {/* ── Logo ── */}
-        <div
-          style={styles.logo}
-          onClick={() => navigate(user?.role === "RECRUITER" ? "/recruiter" : "/jobs")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && navigate(user?.role === "RECRUITER" ? "/recruiter" : "/jobs")}
-        >
+       <div
+  style={styles.logo}
+  onClick={() => navigate("/about")}
+  role="button"
+  tabIndex={0}
+  onKeyDown={(e) =>
+    e.key === "Enter" && navigate("/about")
+  }
+>
           <div style={styles.logoMark}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -366,8 +368,8 @@ const styles = {
   avatar: { width: 32, height: 32, background: "var(--primary-dim)", border: "1.5px solid rgba(79,70,229,0.25)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", fontFamily: "var(--font-display)", fontWeight: "600", fontSize: "12px", flexShrink: 0 },
   userName: { fontSize: "13.5px", fontWeight: "500", color: "var(--text-primary)", letterSpacing: "0.01em", whiteSpace: "nowrap" },
   logoutBtn: { background: "none", border: "1px solid var(--border)", color: "var(--error)", padding: "5px 12px", borderRadius: "var(--r-md)", fontSize: "12.5px", fontWeight: "500", cursor: "pointer", fontFamily: "var(--font-body)", transition: "all 0.15s", letterSpacing: "0.01em", whiteSpace: "nowrap" },
-  mobileRight: { display: "none", alignItems: "center", gap: 8, flexShrink: 0 },
-  hamburger: { background: "none", border: "1px solid var(--border)", borderRadius: "var(--r-md)", width: 40, height: 40, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, cursor: "pointer", padding: 0, flexShrink: 0 },
+  mobileRight: { display: "none", alignItems: "center", gap: 8, flexShrink: 0, minHeight: 44 },
+  hamburger: { background: "none", border: "1px solid var(--border)", borderRadius: "var(--r-md)", width: 44, height: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, cursor: "pointer", padding: 0, flexShrink: 0 },
   hLine: { display: "block", width: 18, height: 2, background: "var(--text-primary)", borderRadius: 2, transition: "transform 0.22s ease, opacity 0.22s ease", transformOrigin: "center" },
   overlay: { position: "fixed", inset: 0, background: "rgba(28,36,34,0.45)", zIndex: 1098, backdropFilter: "blur(2px)" },
   drawer: { position: "fixed", top: 0, right: 0, bottom: 0, width: "min(300px, 85vw)", background: "var(--bg-surface)", zIndex: 1099, boxShadow: "-8px 0 40px rgba(28,36,34,0.18)", display: "flex", flexDirection: "column", transition: "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s", overflowY: "auto" },
